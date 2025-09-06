@@ -1,0 +1,64 @@
+﻿using Godelian.Endpoints.Connection.DTOs;
+using Godelian.Helpers;
+using Godelian.Models;
+using Godelian.Networking.DTOs;
+using MongoDB.Entities;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Godelian.Endpoints.Connection
+{
+    internal static class ConnectionEndpoints
+    {
+        public static async Task<ServerResponse<ClientConnectsResponse>> ClientConnects(ClientRequest<object> clientRequest)
+        {
+            ServerResponse<ClientConnectsResponse> response = new ServerResponse<ClientConnectsResponse>();
+            response.Data.WelcomeMessage = "Welcome to Godelian!";
+
+            if (!string.IsNullOrWhiteSpace(clientRequest.ClientId) || !string.IsNullOrWhiteSpace(clientRequest.ClientNickname))
+            {
+                ClientModel? existingClient = clientRequest.ClientNickname != null ?
+                    await DB.Find<ClientModel>().Match(c => c.Nickname == clientRequest.ClientNickname).ExecuteFirstAsync() :
+                await DB.Find<ClientModel>().Match(c => c.ClientId == clientRequest.ClientId).ExecuteFirstAsync();
+
+                if (existingClient != null)
+                {
+                    response.Data.AssignedClientId = existingClient.ClientId;
+                    response.Message = $"Welcome back {existingClient.Nickname ?? existingClient.ClientId}!";
+                    response.Success = true;
+
+                    existingClient.IsConnected = true;
+                    existingClient.LastActiveAt = DateTime.UtcNow;
+                    await existingClient.SaveAsync();
+
+                    Console.WriteLine($"Client Reconnected: {existingClient.Nickname ?? existingClient.ClientId}");
+
+                    return response;
+                }
+            }
+
+            response.Data.AssignedClientId = Rand.RandomString();
+            response.Message = $"New client {clientRequest.ClientNickname ?? response.Data.AssignedClientId} connected.";
+            response.Success = true;
+
+            ClientModel newClient = new ClientModel
+            {
+                ClientId = response.Data.AssignedClientId,
+                Nickname = clientRequest.ClientNickname,
+                CreatedAt = DateTime.UtcNow,
+                LastActiveAt = DateTime.UtcNow,
+                IsConnected = true
+            };
+
+            await newClient.SaveAsync();
+
+            Console.WriteLine($"New Client Connected: {newClient.Nickname ?? newClient.ClientId}");
+
+            return response;
+        }
+
+    }
+}
