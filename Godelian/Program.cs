@@ -71,7 +71,15 @@ namespace GodelianAPI
             }
 
             while (true) {
-                Thread.Sleep(10000);
+                TimeSpan remaining = ProgressEstimator.EstimateTimeRemaining();
+
+                string remainingText = remaining.TotalDays >= 1
+                    ? remaining.ToString(@"d\.hh\:mm\:ss")
+                    : remaining.ToString(@"hh\:mm\:ss");
+
+                Console.WriteLine($"Progress: {ProgressEstimator.GetPercentageProgress():0.000}% | Est: {remainingText} | Current IP: {IPAddressEnumerator.GetIndexAsIP(ProgressEstimator.CurrentIndex)}");
+
+                Thread.Sleep(20000);
             }
         }
     }

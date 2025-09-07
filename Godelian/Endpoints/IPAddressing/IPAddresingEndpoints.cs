@@ -6,6 +6,7 @@ using Godelian.Networking.DTOs;
 using MongoDB.Entities;
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
@@ -52,7 +53,7 @@ namespace Godelian.Endpoints.IPAddreessing
 
         private static async Task<IPBatch?> MaybeValidateIPBatch(string clientID)
         {
-            int RandomThreshold = 10; // 10% chance to validate a batch
+            int RandomThreshold = 5; // % chance to validate a batch
             int roll = Random.Shared.Next(0, 100);
             if (roll >= RandomThreshold) return null;
 
@@ -127,13 +128,13 @@ namespace Godelian.Endpoints.IPAddreessing
                     };
 
                     response.Message = "New IP range assigned.";
+
+                    ProgressEstimator.UpdateCurrentIndex((uint)(response.Data.Start + response.Data.Count));
                 }
             }
 
             response.Success = true;
-
-            Console.WriteLine($"Assigned IP range {IPAddressEnumerator.GetIndexAsIP(response.Data.Start)} - {IPAddressEnumerator.GetIndexAsIP((uint)(response.Data.Start + response.Data.Count - 1))} to {clientRequest.ClientNickname ?? clientRequest.ClientId}");
-
+            
             return response;
         }
     }

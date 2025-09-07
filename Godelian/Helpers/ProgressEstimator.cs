@@ -27,14 +27,27 @@ namespace Godelian.Helpers
 
         public static float GetPercentageProgress()
         {
-            return (float)(CurrentIndex - IPAddressEnumerator.FirstIPIndex) / (IPAddressEnumerator.LastIPIndex - IPAddressEnumerator.FirstIPIndex) * 100.0f;
+            ulong totalRange = IPAddressEnumerator.LastIPIndex - IPAddressEnumerator.FirstIPIndex;
+
+            ulong progressed = CurrentIndex - IPAddressEnumerator.FirstIPIndex;
+
+            double fraction = (double)progressed / totalRange;
+            return (float)(fraction * 100.0);
         }
 
         public static TimeSpan EstimateTimeRemaining()
         {
-            double progress = (double)(CurrentIndex - IPAddressEnumerator.FirstIPIndex) / (IPAddressEnumerator.LastIPIndex - IPAddressEnumerator.FirstIPIndex);
-            double estimatedTotalSeconds = ElapsedTime.TotalSeconds / progress;
-            double remainingSeconds = estimatedTotalSeconds - ElapsedTime.TotalSeconds;
+            ulong totalRange = IPAddressEnumerator.LastIPIndex - IPAddressEnumerator.FirstIPIndex;
+
+            ulong processedSinceStart = CurrentIndex - StartingIndex;
+            ulong processedFromBeginning = CurrentIndex - IPAddressEnumerator.FirstIPIndex;
+
+            if (processedSinceStart == 0) return TimeSpan.MaxValue;
+
+            double avgSecondsPerUnit = ElapsedTime.TotalSeconds / processedSinceStart;
+            ulong remainingUnits = totalRange - processedFromBeginning;
+            double remainingSeconds = avgSecondsPerUnit * remainingUnits;
+
             return TimeSpan.FromSeconds(remainingSeconds);
         }
     }

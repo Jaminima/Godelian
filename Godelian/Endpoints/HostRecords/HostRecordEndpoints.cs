@@ -61,14 +61,6 @@ namespace Godelian.Endpoints.HostRecords
                 await record.SaveAsync();
             }
 
-            ProgressEstimator.UpdateCurrentIndex((uint)(ipBatch.Start + ipBatch.Count));
-
-            TimeSpan remaining = ProgressEstimator.EstimateTimeRemaining();
-            string remainingText = remaining.TotalDays >= 1
-                ? remaining.ToString(@"d\.hh\:mm\:ss")
-                : remaining.ToString(@"hh\:mm\:ss");
-            Console.WriteLine($"Received IP range {ipBatch.StartIP} - {ipBatch.EndIP} from {clientRequest.ClientNickname ?? clientRequest.ClientId} with {clientRequest.Data.HostRecords.Count} Hosts | Est: {remainingText} {ProgressEstimator.GetPercentageProgress():0.000}% From ");
-
             return response;            
         }
     }
