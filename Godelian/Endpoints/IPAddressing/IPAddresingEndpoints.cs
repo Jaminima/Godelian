@@ -7,6 +7,7 @@ using MongoDB.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -55,13 +56,15 @@ namespace Godelian.Endpoints.IPAddreessing
             int roll = Random.Shared.Next(0, 100);
             if (roll >= RandomThreshold) return null;
 
-            long count = await DB.CountAsync<IPBatch>(x=>x.Completed && x.Validation.Status == ValidationStatus.NotValidated && x.IssuedToClientId != clientID);
+            Expression<Func<IPBatch, bool>> completedBatches = x => x.Completed && x.Validation.Status == ValidationStatus.NotValidated && x.IssuedToClientId != clientID && x.FoundIps != 0;
+
+            long count = await DB.CountAsync<IPBatch>(completedBatches);
             if (count == 0) return null;
 
             int skip = Random.Shared.Next(0, (int)count);
 
             return await DB.Find<IPBatch>()
-                           .Match(x => x.Completed && x.Validation.Status == ValidationStatus.NotValidated && x.IssuedToClientId != clientID)
+                           .Match(completedBatches)
                            .Skip(skip)
                            .Limit(1)
                            .ExecuteFirstAsync();

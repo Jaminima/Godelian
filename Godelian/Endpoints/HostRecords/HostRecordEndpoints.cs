@@ -38,7 +38,7 @@ namespace Godelian.Endpoints.HostRecords
                 ipBatch.Validation.IssuedToClientId = clientRequest.ClientId;
                 ipBatch.Validation.FoundIps = clientRequest.Data.HostRecords.Count;
 
-                Console.WriteLine($"IP Batch {ipBatch.ID} was {ipBatch.Validation.Status.ToString().ToUpper()} when checked by {clientRequest.ClientNickname ?? clientRequest.ClientId}");
+                Console.WriteLine($"IP Batch {ipBatch.ID} was {ipBatch.Validation.Status.ToString().ToUpper()} ({clientRequest.Data.HostRecords.Count}/{ipBatch.FoundIps}) when checked by {clientRequest.ClientNickname ?? clientRequest.ClientId}");
             }
             else if (!ipBatch.Completed)
             {
