@@ -1,3 +1,10 @@
+# Base Configuration
+
+On all servers:
+
+1.  install Docker and configure a Swapfile
+
+```
 sudo fallocate -l 1G /swapfile
 sudo chmod 600 /swapfile
 sudo mkswap /swapfile
@@ -20,13 +27,28 @@ sudo apt-get update
 
 sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
 
-sudo hostnamectl set-hostname <hostname>
-
-// Setup Tailscale
-
-docker swarm init --advertise-addr <IP>
-
 docker node ls
 
 docker service scale <service>=<N>
 docker stack deploy -c docker-deploy.yml hell
+```
+
+2. Set the hostname
+
+```
+sudo hostnamectl set-hostname <hostname>
+```
+
+3. Setup Tailscale using the generated command!
+
+4. On the master server run, this will generate a command you can run on the nodes.
+
+```
+docker swarm init --advertise-addr <TailscaleIP>
+```
+
+You can then edit the `docker-deploy.yml` file to a suitable number of replicas, run `docker stack deploy -c docker-deploy.yml <STACK>` on the server to create instances of the client across the nodes.
+
+# Server Instance
+
+To start the main server instance simply run `docker compose --profile server up -d` on the master server. This will init everything we need, make sure this server has a couple cores, GB of RAM and space to spare. 

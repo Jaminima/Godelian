@@ -3,7 +3,7 @@ services:
     image: jaminima/godelian-v2:latest
     deploy:
       mode: replicated
-      replicas: 33
+      replicas: 30
       placement:
         preferences:
           - spread: node.id
