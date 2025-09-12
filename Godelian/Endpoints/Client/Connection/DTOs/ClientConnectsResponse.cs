@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Godelian.Endpoints.Connection.DTOs
+namespace Godelian.Endpoints.Client.Connection.DTOs
 {
     internal class ClientConnectsResponse
     {

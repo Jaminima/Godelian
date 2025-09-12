@@ -1,5 +1,4 @@
-﻿using Godelian.Endpoints.Connection.DTOs;
-using Godelian.Endpoints.IPAddreessing.DTOs;
+﻿using Godelian.Endpoints.Client.IPAddressing.DTOs;
 using Godelian.Helpers;
 using Godelian.Models;
 using Godelian.Networking.DTOs;
@@ -15,7 +14,7 @@ using System.Text;
 using System.Threading.Tasks;
 using static Godelian.Models.IPBatchValidation;
 
-namespace Godelian.Endpoints.IPAddreessing
+namespace Godelian.Endpoints.Client.IPAddressing
 {
     internal static class IPAddresingEndpoints
     {
@@ -38,7 +37,7 @@ namespace Godelian.Endpoints.IPAddreessing
                                       .Sort(x => x.ID, Order.Descending)
                                       .ExecuteFirstAsync();
 
-            ulong nextStart = latestBatch != null ? (ulong)(latestBatch.Start + latestBatch.Count) : IPAddressEnumerator.FirstIPIndex;
+            ulong nextStart = latestBatch != null ? latestBatch.Start + latestBatch.Count : IPAddressEnumerator.FirstIPIndex;
 
             return new IPBatch
             {
@@ -62,7 +61,7 @@ namespace Godelian.Endpoints.IPAddreessing
 
             Expression<Func<IPBatch, bool>> completedBatches = x => x.Completed && x.Validation.Status == ValidationStatus.NotValidated && x.IssuedToClientId != clientID && x.FoundIps != 0 && x.Iteration == currentIteration;
 
-            ulong count = (ulong)await DB.CountAsync<IPBatch>(completedBatches);
+            ulong count = (ulong)await DB.CountAsync(completedBatches);
             if (count == 0) return null;
 
             int skip = Random.Shared.Next(0, (int)count);
@@ -163,7 +162,7 @@ namespace Godelian.Endpoints.IPAddreessing
                     }
                     else
                     {
-                        ProgressEstimator.UpdateCurrentIndex((ulong)(response.Data.Start + response.Data.Count));
+                        ProgressEstimator.UpdateCurrentIndex(response.Data.Start + response.Data.Count);
                     }
                 }
             }

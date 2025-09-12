@@ -1,13 +1,16 @@
-﻿using Godelian.Endpoints.HostRecords;
-using Godelian.Endpoints.HostRecords.DTOs;
-using Godelian.Networking.DTOs;
+﻿using Godelian.Networking.DTOs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Text.Json;
-using Godelian.Endpoints.Statistics.DTOs;
+using Godelian.Endpoints.Client.HostRecords;
+using Godelian.Endpoints.Client.Connection;
+using Godelian.Endpoints.Client.IPAddressing;
+using Godelian.Endpoints.Client.HostRecords.DTOs;
+using Godelian.Endpoints.Web.Statistics;
+using Godelian.Endpoints.Web.Statistics.DTOs;
 
 namespace Godelian.Endpoints
 {
@@ -19,15 +22,15 @@ namespace Godelian.Endpoints
             return clientRequest.RequestType switch
             {
                 //Client
-                ClientRequestType.Connect => await Connection.ConnectionEndpoints.ClientConnects(clientRequest),
-                ClientRequestType.NewIpRange => await IPAddreessing.IPAddresingEndpoints.GetNewIPRange(clientRequest),
+                ClientRequestType.Connect => await ConnectionEndpoints.ClientConnects(clientRequest),
+                ClientRequestType.NewIpRange => await IPAddresingEndpoints.GetNewIPRange(clientRequest),
                 ClientRequestType.SubmitIpRange => await HostRecordEndpoints.SubmitHostRecords(ConvertPayload<SubmitHostRecordsRequest>(clientRequest)),
 
                 //Web
-                ClientRequestType.ProgressStats => await Statistics.StatisticsEndpoints.ProgressStatistics(clientRequest),
-                ClientRequestType.GetAllIpIndexes => await Statistics.StatisticsEndpoints.GetAllIPIndexes(clientRequest),
-                ClientRequestType.RecentlyActiveClients => await Statistics.StatisticsEndpoints.GetRecentlyActiveClients(clientRequest),
-                ClientRequestType.IPDistributionStats => await Statistics.StatisticsEndpoints.GetIPDistributionStats(ConvertPayload<IPDistributionStats>(clientRequest)),
+                ClientRequestType.ProgressStats => await StatisticsEndpoints.ProgressStatistics(clientRequest),
+                ClientRequestType.GetAllIpIndexes => await StatisticsEndpoints.GetAllIPIndexes(clientRequest),
+                ClientRequestType.RecentlyActiveClients => await StatisticsEndpoints.GetRecentlyActiveClients(clientRequest),
+                ClientRequestType.IPDistributionStats => await StatisticsEndpoints.GetIPDistributionStats(ConvertPayload<IPDistributionStats>(clientRequest)),
 
                 _ => new ServerResponse { Success = false, Message = "Unknown request type." }
             };

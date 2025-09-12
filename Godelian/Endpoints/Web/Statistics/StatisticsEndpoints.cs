@@ -1,5 +1,4 @@
-﻿using Godelian.Endpoints.IPAddreessing.DTOs;
-using Godelian.Endpoints.Statistics.DTOs;
+﻿using Godelian.Endpoints.Web.Statistics.DTOs;
 using Godelian.Helpers;
 using Godelian.Models;
 using Godelian.Networking.DTOs;
@@ -10,7 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Godelian.Endpoints.Statistics
+namespace Godelian.Endpoints.Web.Statistics
 {
     internal static class StatisticsEndpoints
     {

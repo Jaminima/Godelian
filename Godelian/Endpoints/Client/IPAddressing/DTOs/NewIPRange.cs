@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Godelian.Endpoints.IPAddreessing.DTOs
+namespace Godelian.Endpoints.Client.IPAddressing.DTOs
 {
     internal class NewIPRange
     {

@@ -1,6 +1,6 @@
-﻿using Godelian.Endpoints.Connection.DTOs;
-using Godelian.Endpoints.HostRecords.DTOs;
-using Godelian.Endpoints.IPAddreessing.DTOs;
+﻿using Godelian.Endpoints.Client.Connection.DTOs;
+using Godelian.Endpoints.Client.HostRecords.DTOs;
+using Godelian.Endpoints.Client.IPAddressing.DTOs;
 using Godelian.Helpers;
 using Godelian.Models;
 using Godelian.Networking;

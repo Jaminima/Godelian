@@ -5,10 +5,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Godelian.Endpoints.Statistics.DTOs
+namespace Godelian.Endpoints.Web.Statistics.DTOs
 {
-    internal class IPIndexStats
+    internal class RecentlyActiveClients
     {
-        public required HostRecordModel[] hostRecords { get; set; }
+        public required ClientModel[] Clients { get; set; }
     }
 }

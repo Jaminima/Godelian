@@ -1,4 +1,4 @@
-﻿using Godelian.Endpoints.HostRecords.DTOs;
+﻿using Godelian.Endpoints.Client.HostRecords.DTOs;
 using Godelian.Helpers;
 using Godelian.Models;
 using Godelian.Networking.DTOs;
@@ -10,7 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using static Godelian.Models.IPBatchValidation;
 
-namespace Godelian.Endpoints.HostRecords
+namespace Godelian.Endpoints.Client.HostRecords
 {
     internal static class HostRecordEndpoints
     {

@@ -1,4 +1,4 @@
-﻿using Godelian.Endpoints.Connection.DTOs;
+﻿using Godelian.Endpoints.Client.Connection.DTOs;
 using Godelian.Helpers;
 using Godelian.Models;
 using Godelian.Networking.DTOs;
@@ -9,7 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Godelian.Endpoints.Connection
+namespace Godelian.Endpoints.Client.Connection
 {
     internal static class ConnectionEndpoints
     {

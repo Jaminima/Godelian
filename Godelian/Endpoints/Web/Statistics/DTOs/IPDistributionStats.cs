@@ -1,4 +1,4 @@
-﻿namespace Godelian.Endpoints.Statistics.DTOs
+﻿namespace Godelian.Endpoints.Web.Statistics.DTOs
 {
     internal class IPDistributionStats
     {
