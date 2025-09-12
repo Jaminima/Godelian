@@ -68,32 +68,57 @@ namespace Godelian.Endpoints.Statistics
 
         public static async Task<ServerResponse<IPDistributionStatsResponse>> GetIPDistributionStats(ClientRequest<IPDistributionStats> clientRequest)
         {
-            var distributionResults = await DB.Find<IPBatch>().Sort(x=>x.ID,Order.Ascending).ExecuteAsync();
+            List<IPBatch> batches = await DB.Find<IPBatch>().Sort(x=>x.ID,Order.Ascending).ExecuteAsync();
 
-            int[] ipDistribution = distributionResults.Select(b => b.FoundIps ?? 0).ToArray();
+            int requestedBuckets = clientRequest.Data?.NumBuckets ?? 128;
+            if (requestedBuckets <= 0) requestedBuckets = 1;
 
-            //Compress to 256 length array
+            IPDistributionBucket[] buckets;
 
-            int size = clientRequest.Data?.NumBuckets ?? 128;
-
-            if (ipDistribution.Length > size)
+            if (batches.Count == 0)
             {
-                int factor = ipDistribution.Length / size;
-                int[] compressed = new int[size];
-                for (int i = 0; i < size; i++)
-                {
-                    compressed[i] = ipDistribution.Skip(i * factor).Take(factor).Sum();
-                }
-                ipDistribution = compressed;
+                buckets = Array.Empty<IPDistributionBucket>();
             }
+            else if (batches.Count <= requestedBuckets)
+            {
+                buckets = batches.Select(b => new IPDistributionBucket
+                {
+                    StartIP = b.StartIP,
+                    EndIP = b.EndIP,
+                    NumIPs = b.FoundIps ?? 0
+                }).ToArray();
+            }
+            else
+            {
+                int chunkSize = (int)Math.Ceiling(batches.Count / (double)requestedBuckets);
+                List<IPDistributionBucket> compressed = new List<IPDistributionBucket>(requestedBuckets);
 
+                for (int i = 0; i < requestedBuckets; i++)
+                {
+                    int start = i * chunkSize;
+                    if (start >= batches.Count) break;
+                    int endExclusive = Math.Min(start + chunkSize, batches.Count);
+
+                    List<IPBatch> group = batches.Skip(start).Take(endExclusive - start).ToList();
+                    if (group.Count == 0) break;
+
+                    compressed.Add(new IPDistributionBucket
+                    {
+                        StartIP = group.First().StartIP,
+                        EndIP = group.Last().EndIP,
+                        NumIPs = group.Sum(b => b.FoundIps ?? 0)
+                    });
+                }
+
+                buckets = compressed.ToArray();
+            }
 
             return new ServerResponse<IPDistributionStatsResponse>
             {
                 Success = true,
                 Data = new IPDistributionStatsResponse
                 {
-                    NumIPs = ipDistribution
+                    Buckets = buckets
                 }
             };
         }

@@ -5,6 +5,7 @@ import { ChartData, ChartOptions } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
 import { interval, Subscription } from 'rxjs';
 import { ApiService } from '../services/api.service';
+import { IPDistributionBucketDto } from '../types/IPDistributionStats.dto';
 import { ProgressStatsDto } from '../types/ProgressStats.dto';
 import { ServerResponseDto } from '../types/ServerResponse.dto';
 
@@ -23,9 +24,9 @@ export class StatsDashboardComponent implements OnInit, OnDestroy, AfterViewInit
   errorMessage = signal('');
 
   // IP distribution & chart state
-  readonly bucketOptions = [64, 256, 512, 1024];
+  readonly bucketOptions = [64, 128, 256, 512, 1024];
   selectedBuckets = signal<number>(64);
-  ipDistribution = signal<number[] | null>(null);
+  ipDistribution = signal<IPDistributionBucketDto[] | null>(null);
 
   @ViewChild(BaseChartDirective) chart?: BaseChartDirective;
 
@@ -37,6 +38,24 @@ export class StatsDashboardComponent implements OnInit, OnDestroy, AfterViewInit
     scales: {
       x: { title: { display: true, text: 'Bucket' } },
       y: { title: { display: true, text: 'Number of IPs' }, beginAtZero: true }
+    },
+    plugins: {
+      tooltip: {
+        callbacks: {
+          // Show bucket range (StartIP - EndIP) in the tooltip label
+          label: (context) => {
+            const idx = context.dataIndex ?? 0;
+            const buckets = this.ipDistribution();
+            const b = buckets?.[idx];
+            if (b) {
+              return `${b.StartIP} - ${b.EndIP}: ${b.NumIPs}`;
+            }
+            // fallback to default
+            const val = context.parsed?.y ?? context.parsed ?? '0';
+            return `IPs: ${val}`;
+          }
+        }
+      }
     }
   };
 
@@ -73,9 +92,9 @@ export class StatsDashboardComponent implements OnInit, OnDestroy, AfterViewInit
   loadIPDistribution(numBuckets: number) {
     this.apiService.getIPDistributionStats(numBuckets).subscribe({
       next: (res) => {
-        if (res?.Data && Array.isArray(res.Data.NumIPs)) {
-          this.ipDistribution.set(res.Data.NumIPs);
-          this.updateChartData(res.Data.NumIPs);
+        if (res?.Data && Array.isArray(res.Data.Buckets)) {
+          this.ipDistribution.set(res.Data.Buckets);
+          this.updateChartDataFromBuckets(res.Data.Buckets);
         } else {
           this.ipDistribution.set(null);
         }
@@ -102,9 +121,10 @@ export class StatsDashboardComponent implements OnInit, OnDestroy, AfterViewInit
     this.loadIPDistribution(n);
   }
 
-  private updateChartData(data: number[]) {
-    const labels = data.map((_, i) => `B${i + 1}`);
-    this.barChartData = { labels, datasets: [{ data: data as number[], label: 'IPs per bucket', backgroundColor: 'rgba(14,165,233,0.8)' }] };
+  private updateChartDataFromBuckets(buckets: IPDistributionBucketDto[]) {
+    const labels = buckets.map((b, i) => `B${i + 1}`);
+    const data = buckets.map(b => b.NumIPs);
+  this.barChartData = { labels, datasets: [{ data, label: 'IPs per bucket', backgroundColor: 'rgba(14,165,233,0.8)' }] };
     // Ensure chart updates if the directive instance is present
     setTimeout(() => this.chart?.update(), 0);
   }

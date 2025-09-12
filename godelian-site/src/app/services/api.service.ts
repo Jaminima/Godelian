@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ClientRequestDto, ClientRequestType } from '../types/ClientRequest.dto';
+import { IPDistributionStatsDto } from '../types/IPDistributionStats.dto';
 import { ProgressStatsDto } from '../types/ProgressStats.dto';
 import { RecentClientsDto } from '../types/RecentClients.dto';
 import { ServerResponseDto } from '../types/ServerResponse.dto';
@@ -58,8 +59,8 @@ export class ApiService {
     return this.sendRequest<null, RecentClientsDto>({ RequestType: ClientRequestType.RecentlyActiveClients });
   }
 
-  getIPDistributionStats(numBuckets: number): Observable<ServerResponseDto<{ NumIPs: number[] }>> {
-    return this.sendRequest<{ NumBuckets: number }, { NumIPs: number[] }>({
+  getIPDistributionStats(numBuckets: number): Observable<ServerResponseDto<IPDistributionStatsDto>> {
+    return this.sendRequest<{ NumBuckets: number }, IPDistributionStatsDto>({
       RequestType: ClientRequestType.IPDistributionStats,
       Data: { NumBuckets: numBuckets }
     });

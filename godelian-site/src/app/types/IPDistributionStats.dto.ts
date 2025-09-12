@@ -3,5 +3,11 @@ export type IPDistributionStatsRequestDto = {
 };
 
 export type IPDistributionStatsDto = {
-    NumIPs: number[];
+    Buckets: IPDistributionBucketDto[];
 };
+
+export type IPDistributionBucketDto = {
+    StartIP: string;
+    EndIP: string;
+    NumIPs: number;
+}
