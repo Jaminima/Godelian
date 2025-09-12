@@ -11,6 +11,7 @@ namespace Godelian.Networking.DTOs
         public ClientRequestType RequestType { get; set; }
         public string? ClientId { get; set; }
         public string? ClientNickname { get; set; }
+        public string? TaskId { get; set; }
         public T? Data { get; set; }
     }
 }

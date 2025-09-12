@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Text.Json;
+using Godelian.Endpoints.Statistics.DTOs;
 
 namespace Godelian.Endpoints
 {
@@ -17,9 +18,17 @@ namespace Godelian.Endpoints
         {
             return clientRequest.RequestType switch
             {
+                //Client
                 ClientRequestType.Connect => await Connection.ConnectionEndpoints.ClientConnects(clientRequest),
                 ClientRequestType.NewIpRange => await IPAddreessing.IPAddresingEndpoints.GetNewIPRange(clientRequest),
                 ClientRequestType.SubmitIpRange => await HostRecordEndpoints.SubmitHostRecords(ConvertPayload<SubmitHostRecordsRequest>(clientRequest)),
+
+                //Web
+                ClientRequestType.ProgressStats => await Statistics.StatisticsEndpoints.ProgressStatistics(clientRequest),
+                ClientRequestType.GetAllIpIndexes => await Statistics.StatisticsEndpoints.GetAllIPIndexes(clientRequest),
+                ClientRequestType.RecentlyActiveClients => await Statistics.StatisticsEndpoints.GetRecentlyActiveClients(clientRequest),
+                ClientRequestType.IPDistributionStats => await Statistics.StatisticsEndpoints.GetIPDistributionStats(ConvertPayload<IPDistributionStats>(clientRequest)),
+
                 _ => new ServerResponse { Success = false, Message = "Unknown request type." }
             };
         }

@@ -36,7 +36,7 @@ namespace Godelian.Endpoints.IPAddreessing
                                       .Sort(x => x.Start, Order.Descending)
                                       .ExecuteFirstAsync();
 
-            uint nextStart = latestBatch != null ? (uint)(latestBatch.Start + latestBatch.Count) : IPAddressEnumerator.FirstIPIndex;
+            ulong nextStart = latestBatch != null ? (ulong)(latestBatch.Start + latestBatch.Count) : IPAddressEnumerator.FirstIPIndex;
 
             return new IPBatch
             {
@@ -59,7 +59,7 @@ namespace Godelian.Endpoints.IPAddreessing
 
             Expression<Func<IPBatch, bool>> completedBatches = x => x.Completed && x.Validation.Status == ValidationStatus.NotValidated && x.IssuedToClientId != clientID && x.FoundIps != 0;
 
-            long count = await DB.CountAsync<IPBatch>(completedBatches);
+            ulong count = (ulong)await DB.CountAsync<IPBatch>(completedBatches);
             if (count == 0) return null;
 
             int skip = Random.Shared.Next(0, (int)count);
@@ -74,6 +74,11 @@ namespace Godelian.Endpoints.IPAddreessing
         public static async Task<ServerResponse<NewIPRange>> GetNewIPRange(ClientRequest<object> clientRequest)
         {
             ServerResponse<NewIPRange> response = new ServerResponse<NewIPRange>();
+
+            await DB.Update<ClientModel>()
+              .Match(x => x.ClientId == clientRequest.ClientId)
+              .Modify(x => x.LastActiveAt, DateTime.UtcNow)
+              .ExecuteAsync();
 
             IPBatch? batchToValidate = await MaybeValidateIPBatch(clientRequest.ClientId);
 
@@ -91,6 +96,7 @@ namespace Godelian.Endpoints.IPAddreessing
                     IPBatchID = batchToValidate.ID,
                     Count = batchToValidate.Count,
                     Start = batchToValidate.Start,
+                    IsValidation = true
                 };
 
                 response.Message = "Validating IP range assigned";
@@ -110,6 +116,7 @@ namespace Godelian.Endpoints.IPAddreessing
                         IPBatchID = staleBatch.ID,
                         Count = staleBatch.Count,
                         Start = staleBatch.Start,
+                        IsValidation = false
                     };
 
                     response.Message = "Stale IP range assigned.";
@@ -124,12 +131,13 @@ namespace Godelian.Endpoints.IPAddreessing
                     {
                         IPBatchID = nextBatch.ID,
                         Count = nextBatch.Count,
-                        Start = nextBatch.Start
+                        Start = nextBatch.Start,
+                        IsValidation = false
                     };
 
                     response.Message = "New IP range assigned.";
 
-                    ProgressEstimator.UpdateCurrentIndex((uint)(response.Data.Start + response.Data.Count));
+                    ProgressEstimator.UpdateCurrentIndex((ulong)(response.Data.Start + response.Data.Count));
                 }
             }
 

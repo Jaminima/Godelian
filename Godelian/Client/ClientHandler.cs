@@ -20,6 +20,7 @@ namespace Godelian.Client
         private string? clientId;
         private int retryCount = 0;
         private const int maxRetries = 5;
+        private bool isFirstLoop = true;
 
         public ClientHandler()
         {
@@ -53,7 +54,7 @@ namespace Godelian.Client
 
                 if (newIPRange.Success)
                 {
-                    Console.WriteLine($"Received New IP Range: Start={newIPRange.Data.Start}, Count={newIPRange.Data.Count}");
+                    Console.WriteLine($"{newIPRange.Message} Start={newIPRange.Data.Start}, Count={newIPRange.Data.Count}");
                 }
                 else
                 {
@@ -61,7 +62,9 @@ namespace Godelian.Client
                 }
 
                 // Enumerate IPs lazily and throttle concurrency to avoid resource exhaustion
-                IEnumerable<KeyValuePair<uint, string>> ipSequence = IPAddressEnumerator.EnumerateIPRange(newIPRange.Data.Start, newIPRange.Data.Count);
+                IEnumerable<KeyValuePair<ulong, string>> ipSequence = IPAddressEnumerator.EnumerateIPRange(newIPRange.Data.Start, newIPRange.Data.Count);
+
+                HostFetcher.SetTimeout(newIPRange.Data.IsValidation ? 10 : 5);
 
                 ConcurrentBag<HostRecordModel> results = new ConcurrentBag<HostRecordModel>();
                 ParallelOptions parallelOptions = new ParallelOptions
@@ -100,7 +103,8 @@ namespace Godelian.Client
             ClientRequest<object> req = new ClientRequest<object>
             {
                 RequestType = ClientRequestType.Connect,
-                ClientNickname = Config.GodelianNickname
+                ClientNickname = Config.GodelianNickname,
+                TaskId = Config.TaskSlot
             };
 
             return await httpClient.SendRequest<object,ClientConnectsResponse>(req);
@@ -112,7 +116,8 @@ namespace Godelian.Client
             {
                 RequestType = ClientRequestType.NewIpRange,
                 ClientId = clientId,
-                ClientNickname = Config.GodelianNickname
+                ClientNickname = Config.GodelianNickname,
+                TaskId = Config.TaskSlot
             };
             return await httpClient.SendRequest<object, NewIPRange>(req);
         }
@@ -124,6 +129,7 @@ namespace Godelian.Client
                 RequestType = ClientRequestType.SubmitIpRange,
                 ClientId = clientId,
                 ClientNickname = Config.GodelianNickname,
+                TaskId = Config.TaskSlot,
                 Data = new SubmitHostRecordsRequest() { HostRecords = records, IPBatchID = ipBatchID }
             };
 

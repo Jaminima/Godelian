@@ -9,7 +9,8 @@ namespace Godelian.Endpoints.IPAddreessing.DTOs
     internal class NewIPRange
     {
         public string IPBatchID { get; set; }
-        public uint Start { get; set; }
-        public int Count { get; set; }
+        public ulong Start { get; set; }
+        public ulong Count { get; set; }
+        public bool IsValidation { get; set; }
     }
 }

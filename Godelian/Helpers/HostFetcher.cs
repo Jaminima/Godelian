@@ -1,9 +1,12 @@
 ﻿using Godelian.Models;
+using HtmlAgilityPack;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Godelian.Helpers
 {
@@ -18,13 +21,19 @@ namespace Godelian.Helpers
             return client;
         }
 
-        uint IPIndex;
+        ulong IPIndex;
         string IPAddress;
 
-        public HostFetcher(uint IPIndex, string IPAddress)
+        public HostFetcher(ulong IPIndex, string IPAddress)
         {
             this.IPIndex = IPIndex;
             this.IPAddress = IPAddress;
+        }
+
+        public static void SetTimeout(int seconds)
+        {
+            client = new HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(seconds);
         }
 
         public async Task<HostRecordModel?> Fetch()
@@ -56,219 +65,144 @@ namespace Godelian.Helpers
                 return null;
             }
         }
+        private bool TryMakeAbsolute(string baseAddress, string candidate, out string absolute)
+        {
+            absolute = candidate;
+            if (Uri.TryCreate(candidate, UriKind.Absolute, out _))
+                return true;
 
-        // Single-pass feature extraction to avoid multiple scans over large HTML bodies.
+            if (Uri.TryCreate(baseAddress, UriKind.Absolute, out var baseUri) &&
+                Uri.TryCreate(baseUri, candidate, out var abs))
+            {
+                absolute = abs.ToString();
+                return true;
+            }
+            return false;
+        }
+
         public List<Feature> ExtractFeatures(string responseBody)
         {
             List<Feature> features = new();
             if (string.IsNullOrEmpty(responseBody)) return features;
 
+            HtmlDocument htmlDocument = new HtmlDocument();
+            htmlDocument.LoadHtml(responseBody);
+
             StringBuilder textBuffer = new();
-            StringBuilder tagBuffer = new();
-
-            bool insideTag = false;
-            bool insideScript = false;
-            bool insideStyle = false;
-            bool capturingTitle = false;
-            bool capturingHeading = false;
-            string? currentHeadingTag = null; // h1..h6
-
-            void FlushPlainText()
+            HashSet<string> headings = new(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> links = new(StringComparer.OrdinalIgnoreCase); 
+            HashSet<string> images = new(StringComparer.OrdinalIgnoreCase);
+            
+            // Title
+            HtmlNode titleNode = htmlDocument.DocumentNode.SelectSingleNode("//title");
+            if (titleNode != null)
             {
-                if (capturingTitle || capturingHeading) return; // Wait until closing tag to add as specific feature
-                if (textBuffer.Length == 0) return;
-                string content = NormalizeWhitespace(textBuffer.ToString());
-                textBuffer.Clear();
-                if (content.Length == 0) return;
-                // Heuristic: ignore extremely short snippets (like stray punctuation)
-                if (content.Trim().Length < 3) return;
-                features.Add(new Feature { Type = FeatureType.Text, Content = content });
+                string titleText = HtmlEntity.DeEntitize(titleNode.InnerText).Trim();
+                if (titleText.Length > 0)
+                {
+                    features.Add(new Feature { Content = titleText, Type = FeatureType.Title });
+                }
             }
 
-            static string NormalizeWhitespace(string s)
+            foreach (HtmlNode node in htmlDocument.DocumentNode.Descendants())
             {
-                Span<char> bufferSpan = stackalloc char[Math.Min(s.Length, 4096)];
-                // Fallback to simple path for long strings.
-                if (s.Length > bufferSpan.Length)
+                // Collect visible text
+                if (node.NodeType == HtmlNodeType.Text)
                 {
-                    return string.Join(' ', s.Split((char[])null!, StringSplitOptions.RemoveEmptyEntries));
-                }
-                int w = 0;
-                bool prevSpace = false;
-                foreach (char c in s)
-                {
-                    if (char.IsWhiteSpace(c))
+                    string text = HtmlEntity.DeEntitize(node.InnerText);
+                    if (string.IsNullOrWhiteSpace(text)) continue;
+
+                    string parentName = node.ParentNode?.Name?.ToLowerInvariant() ?? "";
+
+                    // Skip non-visible or undesirable parents
+                    if (parentName is "script" or "style" or "noscript" or "head" or "meta" or "svg" or "title")
+                        continue;
+
+                    // Check if it's a heading
+                    if (parentName is "h1" or "h2" or "h3" or "h4" or "h5" or "h6")
                     {
-                        if (!prevSpace && w > 0)
+                        string headingText = text.Trim();
+                        if (headingText.Length > 0 && headings.Add(headingText))
                         {
-                            bufferSpan[w++] = ' ';
+                            features.Add(new Feature { Content = headingText, Type = FeatureType.Heading });
                         }
-                        prevSpace = true;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        textBuffer.Append(text).Append(' ');
+                    }
+                }
+                // Collect anchor hrefs
+                else if (node.Name.Equals("a", StringComparison.OrdinalIgnoreCase))
+                {
+                    string? href = node.GetAttributeValue("href", null);
+                    if (string.IsNullOrWhiteSpace(href)) continue;
+
+                    href = href.Trim();
+
+                    if (href.StartsWith("#") ||
+                        href.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase) ||
+                        href.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    href = HtmlEntity.DeEntitize(href);
+
+                    if (TryMakeAbsolute($"http://{IPAddress}", href, out var absolute))
+                    {
+                        links.Add(absolute);
                     }
                     else
                     {
-                        bufferSpan[w++] = c;
-                        prevSpace = false;
+                        links.Add(href);
                     }
                 }
-                if (w == 0) return string.Empty;
-                if (bufferSpan[w - 1] == ' ') w--;
-                return new string(bufferSpan[..w]);
-            }
-
-            Dictionary<string, string> ParseAttributes(string tagContent)
-            {
-                Dictionary<string, string> dict = new(StringComparer.OrdinalIgnoreCase);
-                int i = 0;
-                while (i < tagContent.Length)
+                // Collect image src
+                else if (node.Name.Equals("img", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Skip whitespace
-                    while (i < tagContent.Length && char.IsWhiteSpace(tagContent[i])) i++;
-                    int startName = i;
-                    while (i < tagContent.Length && (char.IsLetterOrDigit(tagContent[i]) || tagContent[i] == '-' || tagContent[i] == '_' || tagContent[i] == ':')) i++;
-                    if (i == startName) break;
-                    string name = tagContent[startName..i];
-                    while (i < tagContent.Length && char.IsWhiteSpace(tagContent[i])) i++;
-                    string value = "";
-                    if (i < tagContent.Length && tagContent[i] == '=')
-                    {
-                        i++; // skip '='
-                        while (i < tagContent.Length && char.IsWhiteSpace(tagContent[i])) i++;
-                        if (i < tagContent.Length && (tagContent[i] == '"' || tagContent[i] == '\''))
-                        {
-                            char quote = tagContent[i++];
-                            int startVal = i;
-                            while (i < tagContent.Length && tagContent[i] != quote) i++;
-                            value = tagContent[startVal..Math.Min(i, tagContent.Length)];
-                            if (i < tagContent.Length && tagContent[i] == quote) i++;
-                        }
-                        else
-                        {
-                            int startVal = i;
-                            while (i < tagContent.Length && !char.IsWhiteSpace(tagContent[i]) && tagContent[i] != '>' && tagContent[i] != '/') i++;
-                            value = tagContent[startVal..i];
-                        }
-                    }
-                    dict[name] = value;
-                }
-                return dict;
-            }
+                    string? src = node.GetAttributeValue("src", null);
+                    if (string.IsNullOrWhiteSpace(src)) continue;
 
-            for (int idx = 0; idx < responseBody.Length; idx++)
-            {
-                char c = responseBody[idx];
+                    src = HtmlEntity.DeEntitize(src.Trim());
 
-                if (!insideTag)
-                {
-                    if (c == '<')
+                    // Skip inline data URIs
+                    if (src.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    if (TryMakeAbsolute($"http://{IPAddress}", src, out var absoluteImg))
                     {
-                        insideTag = true;
-                        tagBuffer.Clear();
-                        FlushPlainText();
+                        images.Add(absoluteImg);
                     }
                     else
                     {
-                        if (!insideScript && !insideStyle)
-                        {
-                            // Capture only human-visible text segments
-                            textBuffer.Append(c);
-                        }
-                    }
-                }
-                else
-                {
-                    if (c == '>')
-                    {
-                        insideTag = false;
-                        string rawTag = tagBuffer.ToString();
-                        bool isClosing = rawTag.StartsWith('/');
-                        string tagContent = isClosing ? rawTag[1..] : rawTag;
-                        // Extract tag name
-                        string tagName = tagContent;
-                        int spaceIdx = tagContent.IndexOfAny([' ', '\t', '\r', '\n', '/']);
-                        if (spaceIdx >= 0)
-                        {
-                            tagName = tagContent[..spaceIdx];
-                        }
-                        tagName = tagName.ToLowerInvariant();
-
-                        if (isClosing)
-                        {
-                            if (tagName == "script") insideScript = false;
-                            else if (tagName == "style") insideStyle = false;
-                            else if (tagName == "title" && capturingTitle)
-                            {
-                                string title = NormalizeWhitespace(textBuffer.ToString());
-                                textBuffer.Clear();
-                                if (title.Length > 0)
-                                    features.Add(new Feature { Type = FeatureType.Title, Content = title });
-                                capturingTitle = false;
-                            }
-                            else if (capturingHeading && tagName == currentHeadingTag)
-                            {
-                                string heading = NormalizeWhitespace(textBuffer.ToString());
-                                textBuffer.Clear();
-                                if (heading.Length > 0)
-                                    features.Add(new Feature { Type = FeatureType.Heading, Content = heading });
-                                capturingHeading = false;
-                                currentHeadingTag = null;
-                            }
-                        }
-                        else
-                        {
-                            // Opening tag or self-closing
-                            string remainder = tagContent.Length > tagName.Length ? tagContent[tagName.Length..] : string.Empty;
-                            var attrs = ParseAttributes(remainder);
-
-                            switch (tagName)
-                            {
-                                case "script":
-                                    insideScript = true;
-                                    if (attrs.TryGetValue("src", out var src) && src.Length > 0)
-                                    {
-                                        features.Add(new Feature { Type = FeatureType.Script, Content = src });
-                                    }
-                                    break;
-                                case "style":
-                                    insideStyle = true;
-                                    break;
-                                case "title":
-                                    capturingTitle = true;
-                                    break;
-                                case "img":
-                                    if (attrs.TryGetValue("src", out var imgSrc) && imgSrc.Length > 0)
-                                    {
-                                        string alt = attrs.TryGetValue("alt", out var altVal) ? altVal : string.Empty;
-                                        string combined = string.IsNullOrWhiteSpace(alt) ? imgSrc : $"{alt} ({imgSrc})";
-                                        features.Add(new Feature { Type = FeatureType.Image, Content = NormalizeWhitespace(combined) });
-                                    }
-                                    break;
-                                case "a":
-                                    if (attrs.TryGetValue("href", out var href) && href.Length > 0)
-                                    {
-                                        features.Add(new Feature { Type = FeatureType.Link, Content = href });
-                                    }
-                                    break;
-                                default:
-                                    if (tagName.Length == 2 && tagName[0] == 'h' && char.IsDigit(tagName[1]) && tagName[1] >= '1' && tagName[1] <= '6')
-                                    {
-                                        capturingHeading = true;
-                                        currentHeadingTag = tagName;
-                                    }
-                                    break;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Still inside tag declaration
-                        tagBuffer.Append(c);
+                        images.Add(src);
                     }
                 }
             }
 
-            // Final flush for any stray text (not title/heading because would need closing tag to finalize)
-            FlushPlainText();
+            // Normalize whitespace in collected text
+            string normalizedText = Regex.Replace(textBuffer.ToString(), @"\s+", " ").Trim();
+            if (normalizedText.Length > 0)
+            {
+                features.Add(new Feature { Content = normalizedText, Type = FeatureType.Text });
+            }
+
+            foreach (string heading in headings)
+            {
+                features.Add(new Feature { Content = heading, Type = FeatureType.Heading });
+            }
+
+            foreach (string link in links)
+            {
+                features.Add(new Feature { Content = link, Type = FeatureType.Link });
+            }
+
+            foreach (string img in images)
+            {
+                features.Add(new Feature { Content = img, Type = FeatureType.Image });
+            }
 
             return features;
         }

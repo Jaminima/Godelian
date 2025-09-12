@@ -18,6 +18,11 @@ namespace Godelian.Endpoints.HostRecords
         {
             ServerResponse<SubmitHostRecordsResponse> response = new ServerResponse<SubmitHostRecordsResponse>();
 
+            await DB.Update<ClientModel>()
+              .Match(x => x.ClientId == clientRequest.ClientId)
+              .Modify(x => x.LastActiveAt, DateTime.UtcNow)
+              .ExecuteAsync();
+
             IPBatch? ipBatch = await DB.Find<IPBatch>()
                                       .Match(x => x.ID == clientRequest.Data.IPBatchID)
                                       .ExecuteFirstAsync();

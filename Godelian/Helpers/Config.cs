@@ -30,6 +30,7 @@ namespace Godelian.Helpers
             }
         }
         public static string? GodelianNickname => Environment.GetEnvironmentVariable("GODELIAN_NICKNAME") ?? null;
+        public static string? TaskSlot => Environment.GetEnvironmentVariable("GODELIAN_TASK_SLOT") ?? null;
 
         public static int MaxConcurrentFetches
         {

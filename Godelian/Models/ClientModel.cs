@@ -11,6 +11,7 @@ namespace Godelian.Models
     {
         public required string ClientId { get; set; }
         public string? Nickname { get; set; }
+        public string? TaskId { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime LastActiveAt { get; set; } = DateTime.UtcNow;
         public bool IsConnected { get; set; } = true;

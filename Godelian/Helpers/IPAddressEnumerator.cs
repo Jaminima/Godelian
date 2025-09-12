@@ -8,18 +8,18 @@ namespace Godelian.Helpers
 {
     internal static class IPAddressEnumerator
     {
-        public const uint FirstIPIndex = 16843009; //1.1.1.1
-        public const uint LastIPIndex = 4294967294; //255.255.255.255
+        public const ulong FirstIPIndex = 16843009; //1.1.1.1
+        public const ulong LastIPIndex = 4294967294; //255.255.255.255
 
-        public static IEnumerable<KeyValuePair<uint, string>> EnumerateIPRange(uint startIdx, int count)
+        public static IEnumerable<KeyValuePair<ulong, string>> EnumerateIPRange(ulong startIdx, ulong count)
         {
-            for (uint i = startIdx; i < startIdx + count; i++)
+            for (ulong i = startIdx; i < startIdx + count; i++)
             {
-                yield return new KeyValuePair<uint, string>(i, GetIndexAsIP(i));
+                yield return new KeyValuePair<ulong, string>(i, GetIndexAsIP(i));
             }
         }
 
-        public static string GetIndexAsIP(uint index)
+        public static string GetIndexAsIP(ulong index)
         {
             int[] ipParts = new int[4];
             ipParts[0] = (int)((index >> 24) & 0xFF);

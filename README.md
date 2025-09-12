@@ -49,6 +49,12 @@ docker swarm init --advertise-addr <TailscaleIP>
 
 You can then edit the `docker-deploy.yml` file to a suitable number of replicas, run `docker stack deploy -c docker-deploy.yml <STACK>` on the server to create instances of the client across the nodes.
 
+Check that everything is running with `docker service ls` and `docker service ps <SERVICE>`.
+
+Inspect the number of replicas per node with `docker service ps <SERVICE> --filter desired-state=running --format '{{.Node}}' | sort | uniq -c`.
+
+Increase or decrease the number of replicas with `docker service scale <SERVICE>=<N>`.
+
 # Server Instance
 
 To start the main server instance simply run `docker compose --profile server up -d` on the master server. This will init everything we need, make sure this server has a couple cores, GB of RAM and space to spare. 

@@ -5,6 +5,10 @@
         Connect,
         Disconnect,
         NewIpRange,
-        SubmitIpRange
+        SubmitIpRange,
+        ProgressStats,
+        GetAllIpIndexes,
+        RecentlyActiveClients,
+        IPDistributionStats
     }
 }

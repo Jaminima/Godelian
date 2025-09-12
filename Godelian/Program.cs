@@ -57,7 +57,7 @@ namespace GodelianAPI
                                           .Sort(x => x.Start, Order.Descending)
                                           .ExecuteFirstAsync().Result;
 
-                ProgressEstimator.Init(latestBatch != null ? (uint)(latestBatch.Start + latestBatch.Count) : IPAddressEnumerator.FirstIPIndex);
+                ProgressEstimator.Init(latestBatch != null ? (ulong)(latestBatch.Start + latestBatch.Count) : IPAddressEnumerator.FirstIPIndex);
 
                 httpServer = new HTTPServer(9000);
                 _ = httpServer.Start();
@@ -71,13 +71,16 @@ namespace GodelianAPI
             }
 
             while (true) {
-                TimeSpan remaining = ProgressEstimator.EstimateTimeRemaining();
+                if (Config.IsServer)
+                {
+                    TimeSpan remaining = ProgressEstimator.EstimateTimeRemaining();
 
-                string remainingText = remaining.TotalDays >= 1
-                    ? remaining.ToString(@"d\.hh\:mm\:ss")
-                    : remaining.ToString(@"hh\:mm\:ss");
+                    string remainingText = remaining.TotalDays >= 1
+                        ? remaining.ToString(@"d\.hh\:mm\:ss")
+                        : remaining.ToString(@"hh\:mm\:ss");
 
-                Console.WriteLine($"Progress: {ProgressEstimator.GetPercentageProgress():0.000}% | Est: {remainingText} | Current IP: {IPAddressEnumerator.GetIndexAsIP(ProgressEstimator.CurrentIndex)}");
+                    Console.WriteLine($"Progress: {ProgressEstimator.GetPercentageProgress():0.000}% | Est: {remainingText} | Current IP: {IPAddressEnumerator.GetIndexAsIP(ProgressEstimator.CurrentIndex)}");
+                }
 
                 Thread.Sleep(20000);
             }

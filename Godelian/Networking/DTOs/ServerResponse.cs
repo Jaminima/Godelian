@@ -16,11 +16,11 @@ namespace Godelian.Networking.DTOs
             if (!Success)
                 throw new Exception(Message ?? "Server Error Occured");
         }
-        public object Data { get; set; } = null;
+        public object? Data { get; set; } = null;
     }
 
-    internal class ServerResponse<T> : ServerResponse where T : class, new()
+    internal class ServerResponse<T> : ServerResponse
     {
-        public T Data { get; set; } = new T();
+        public new T? Data { get; set; } = default(T);
     }
 }

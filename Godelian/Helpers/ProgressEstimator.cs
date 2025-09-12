@@ -8,19 +8,19 @@ namespace Godelian.Helpers
 {
     internal static class ProgressEstimator
     {
-        public static uint StartingIndex { get; private set; }
+        public static ulong StartingIndex { get; private set; }
         public static DateTime StartTime { get; private set; }
-        public static uint CurrentIndex { get; private set; }
+        public static ulong CurrentIndex { get; private set; }
         public static TimeSpan ElapsedTime => DateTime.UtcNow - StartTime;
 
-        public static void Init(uint startingIndex)
+        public static void Init(ulong startingIndex)
         {
             StartingIndex = startingIndex;
             StartTime = DateTime.UtcNow;
             CurrentIndex = startingIndex;
         }
 
-        public static void UpdateCurrentIndex(uint currentIndex)
+        public static void UpdateCurrentIndex(ulong currentIndex)
         {
             CurrentIndex = currentIndex;
         }

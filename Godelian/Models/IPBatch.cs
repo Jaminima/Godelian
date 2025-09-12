@@ -11,8 +11,8 @@ namespace Godelian.Models
     internal class IPBatch : Entity
     {
         public required string IssuedToClientId { get; set; }
-        public uint Start { get; set; }
-        public int Count { get; set; }
+        public ulong Start { get; set; }
+        public ulong Count { get; set; }
         public required string StartIP { get; set; }
         public required string EndIP { get; set; }
         public DateTime IssuedAt { get; set; } = DateTime.UtcNow;
