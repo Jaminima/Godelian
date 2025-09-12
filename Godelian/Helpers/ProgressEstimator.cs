@@ -23,7 +23,7 @@ namespace Godelian.Helpers
         public static void Reset()
         {
             StartingIndex = IPAddressEnumerator.FirstIPIndex;
-            StartTime = DateTime.MinValue;
+            StartTime = DateTime.UtcNow;
             CurrentIndex = IPAddressEnumerator.FirstIPIndex;
         }
 
