@@ -20,6 +20,13 @@ namespace Godelian.Helpers
             CurrentIndex = startingIndex;
         }
 
+        public static void Reset()
+        {
+            StartingIndex = IPAddressEnumerator.FirstIPIndex;
+            StartTime = DateTime.MinValue;
+            CurrentIndex = IPAddressEnumerator.FirstIPIndex;
+        }
+
         public static void UpdateCurrentIndex(ulong currentIndex)
         {
             CurrentIndex = currentIndex;

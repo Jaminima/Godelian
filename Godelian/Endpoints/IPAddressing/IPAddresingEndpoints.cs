@@ -3,6 +3,7 @@ using Godelian.Endpoints.IPAddreessing.DTOs;
 using Godelian.Helpers;
 using Godelian.Models;
 using Godelian.Networking.DTOs;
+using Godelian.Services;
 using MongoDB.Entities;
 using System;
 using System.Collections.Generic;
@@ -20,20 +21,21 @@ namespace Godelian.Endpoints.IPAddreessing
     {
         private const int AddressStepSize = 1024 * 4;
 
-        private static async Task<IPBatch?> GetStaleIPBatch()
+        private static async Task<IPBatch?> GetStaleIPBatch(int currentIteration)
         {
             DateTime tenMinsAgo = DateTime.UtcNow.AddMinutes(-10);
 
             return await DB.Find<IPBatch>()
-                           .Match(x => !x.Completed && x.IssuedAt < tenMinsAgo)
+                           .Match(x => !x.Completed && x.IssuedAt < tenMinsAgo && x.Iteration == currentIteration)
                            .Sort(x => x.IssuedAt, Order.Ascending)
                            .ExecuteFirstAsync();
         }
 
-        private static async Task<IPBatch> GetNextIPBatch(string clientId)
+        private static async Task<IPBatch> GetNextIPBatch(string clientId, int currentIteration)
         {
             IPBatch? latestBatch = await DB.Find<IPBatch>()
-                                      .Sort(x => x.Start, Order.Descending)
+                                      .Match(x=>x.Iteration == currentIteration)
+                                      .Sort(x => x.ID, Order.Descending)
                                       .ExecuteFirstAsync();
 
             ulong nextStart = latestBatch != null ? (ulong)(latestBatch.Start + latestBatch.Count) : IPAddressEnumerator.FirstIPIndex;
@@ -43,6 +45,7 @@ namespace Godelian.Endpoints.IPAddreessing
                 IssuedToClientId = clientId,
                 Start = nextStart,
                 Count = AddressStepSize,
+                Iteration = currentIteration,
                 StartIP = IPAddressEnumerator.GetIndexAsIP(nextStart),
                 EndIP = IPAddressEnumerator.GetIndexAsIP(nextStart + AddressStepSize - 1),
                 IssuedAt = DateTime.UtcNow,
@@ -51,13 +54,13 @@ namespace Godelian.Endpoints.IPAddreessing
             };
         }
 
-        private static async Task<IPBatch?> MaybeValidateIPBatch(string clientID)
+        private static async Task<IPBatch?> MaybeValidateIPBatch(string clientID, int currentIteration)
         {
-            int RandomThreshold = 5; // % chance to validate a batch
+            int RandomThreshold = 2; // % chance to validate a batch
             int roll = Random.Shared.Next(0, 100);
             if (roll >= RandomThreshold) return null;
 
-            Expression<Func<IPBatch, bool>> completedBatches = x => x.Completed && x.Validation.Status == ValidationStatus.NotValidated && x.IssuedToClientId != clientID && x.FoundIps != 0;
+            Expression<Func<IPBatch, bool>> completedBatches = x => x.Completed && x.Validation.Status == ValidationStatus.NotValidated && x.IssuedToClientId != clientID && x.FoundIps != 0 && x.Iteration == currentIteration;
 
             ulong count = (ulong)await DB.CountAsync<IPBatch>(completedBatches);
             if (count == 0) return null;
@@ -73,6 +76,9 @@ namespace Godelian.Endpoints.IPAddreessing
 
         public static async Task<ServerResponse<NewIPRange>> GetNewIPRange(ClientRequest<object> clientRequest)
         {
+            IterationTracker iteration = await IterationService.GetCurrentIteration();
+            int currentIteration = iteration.Iteration;
+
             ServerResponse<NewIPRange> response = new ServerResponse<NewIPRange>();
 
             await DB.Update<ClientModel>()
@@ -80,7 +86,7 @@ namespace Godelian.Endpoints.IPAddreessing
               .Modify(x => x.LastActiveAt, DateTime.UtcNow)
               .ExecuteAsync();
 
-            IPBatch? batchToValidate = await MaybeValidateIPBatch(clientRequest.ClientId);
+            IPBatch? batchToValidate = await MaybeValidateIPBatch(clientRequest.ClientId, currentIteration);
 
             if (batchToValidate != null)
             {
@@ -101,7 +107,7 @@ namespace Godelian.Endpoints.IPAddreessing
 
                 response.Message = "Validating IP range assigned";
             } else { 
-                IPBatch? staleBatch = await GetStaleIPBatch();
+                IPBatch? staleBatch = await GetStaleIPBatch(currentIteration);
 
                 if (staleBatch != null)
                 {
@@ -123,7 +129,7 @@ namespace Godelian.Endpoints.IPAddreessing
                 }
                 else
                 {
-                    IPBatch nextBatch = await GetNextIPBatch(clientRequest.ClientId!);
+                    IPBatch nextBatch = await GetNextIPBatch(clientRequest.ClientId!, currentIteration);
 
                     await nextBatch.SaveAsync();
 
@@ -137,7 +143,28 @@ namespace Godelian.Endpoints.IPAddreessing
 
                     response.Message = "New IP range assigned.";
 
-                    ProgressEstimator.UpdateCurrentIndex((ulong)(response.Data.Start + response.Data.Count));
+                    ulong newIndex = nextBatch.Start + nextBatch.Count;
+
+                    if (newIndex >= IPAddressEnumerator.LastIPIndex)
+                    {
+                        iteration.CompletedAt = DateTime.UtcNow;
+                        await iteration.SaveAsync();
+
+                        IterationTracker newIteration = new IterationTracker
+                        {
+                            Iteration = currentIteration + 1,
+                            StartedAt = DateTime.UtcNow,
+                            CompletedAt = null
+                        };
+
+                        await newIteration.SaveAsync();
+
+                        ProgressEstimator.Reset();
+                    }
+                    else
+                    {
+                        ProgressEstimator.UpdateCurrentIndex((ulong)(response.Data.Start + response.Data.Count));
+                    }
                 }
             }
 

@@ -11,6 +11,7 @@ namespace Godelian.Models
     internal class IPBatch : Entity
     {
         public required string IssuedToClientId { get; set; }
+        public int Iteration { get; set; }
         public ulong Start { get; set; }
         public ulong Count { get; set; }
         public required string StartIP { get; set; }
