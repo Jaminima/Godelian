@@ -11,6 +11,8 @@ using Godelian.Endpoints.Client.IPAddressing;
 using Godelian.Endpoints.Client.HostRecords.DTOs;
 using Godelian.Endpoints.Web.Statistics;
 using Godelian.Endpoints.Web.Statistics.DTOs;
+using Godelian.Endpoints.Web.Search;
+using Godelian.Endpoints.Web.Search.DTOs;
 
 namespace Godelian.Endpoints
 {
@@ -28,7 +30,7 @@ namespace Godelian.Endpoints
 
                 //Web
                 ClientRequestType.ProgressStats => await StatisticsEndpoints.ProgressStatistics(clientRequest),
-                ClientRequestType.GetAllIpIndexes => await StatisticsEndpoints.GetAllIPIndexes(clientRequest),
+                ClientRequestType.SearchRecords => await SearchEndpoints.SearchRecords(ConvertPayload<SearchQuery>(clientRequest)),
                 ClientRequestType.RecentlyActiveClients => await StatisticsEndpoints.GetRecentlyActiveClients(clientRequest),
                 ClientRequestType.IPDistributionStats => await StatisticsEndpoints.GetIPDistributionStats(ConvertPayload<IPDistributionStats>(clientRequest)),
 

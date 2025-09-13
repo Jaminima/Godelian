@@ -7,7 +7,7 @@
         NewIpRange,
         SubmitIpRange,
         ProgressStats,
-        GetAllIpIndexes,
+        SearchRecords,
         RecentlyActiveClients,
         IPDistributionStats
     }

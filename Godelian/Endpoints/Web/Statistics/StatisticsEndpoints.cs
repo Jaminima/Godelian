@@ -1,4 +1,5 @@
-﻿using Godelian.Endpoints.Web.Statistics.DTOs;
+﻿using Godelian.Endpoints.Web.Search.DTOs;
+using Godelian.Endpoints.Web.Statistics.DTOs;
 using Godelian.Helpers;
 using Godelian.Models;
 using Godelian.Networking.DTOs;
@@ -30,20 +31,6 @@ namespace Godelian.Endpoints.Web.Statistics
             {
                 Success = true,
                 Data = progressStats
-            };
-        }
-
-        public static async Task<ServerResponse<IPIndexStats>> GetAllIPIndexes(ClientRequest<object> clientRequest)
-        {
-            List<HostRecordModel> indexes = await DB.Find<HostRecordModel>()
-                                          .Sort(x => x.ID, Order.Ascending)
-                                          .Project(x=>new HostRecordModel { ID = x.ID, IPIndex = x.IPIndex, IPAddress = x.IPAddress, Hostname = x.Hostname, FoundByClientId = x.FoundByClientId })
-                                          .ExecuteAsync();
-
-            return new ServerResponse<IPIndexStats>
-            {
-                Success = true,
-                Data = new IPIndexStats { hostRecords = indexes.ToArray() }
             };
         }
 

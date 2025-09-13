@@ -5,9 +5,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Godelian.Endpoints.Web.Statistics.DTOs
+namespace Godelian.Endpoints.Web.Search.DTOs
 {
-    internal class IPIndexStats
+    internal class SearchResults
     {
         public required HostRecordModel[] hostRecords { get; set; }
     }
