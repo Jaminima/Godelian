@@ -33,6 +33,7 @@ namespace Godelian.Endpoints
                 ClientRequestType.SearchRecords => await SearchEndpoints.SearchRecords(ConvertPayload<SearchQuery>(clientRequest)),
                 ClientRequestType.RecentlyActiveClients => await StatisticsEndpoints.GetRecentlyActiveClients(clientRequest),
                 ClientRequestType.IPDistributionStats => await StatisticsEndpoints.GetIPDistributionStats(ConvertPayload<IPDistributionStats>(clientRequest)),
+                ClientRequestType.GetRandomRecord => await SearchEndpoints.GetRandomRecord(clientRequest),
 
                 _ => new ServerResponse { Success = false, Message = "Unknown request type." }
             };

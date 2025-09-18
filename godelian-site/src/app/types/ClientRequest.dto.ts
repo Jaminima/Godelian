@@ -14,5 +14,6 @@ export enum ClientRequestType {
         ProgressStats=4,
         SearchRecords=5,
         RecentlyActiveClients=6,
-        IPDistributionStats=7
+        IPDistributionStats=7,
+        GetRandomRecord=8,
 }

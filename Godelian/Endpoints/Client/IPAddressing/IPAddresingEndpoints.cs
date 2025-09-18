@@ -11,6 +11,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using static Godelian.Models.IPBatchValidation;
 
@@ -19,6 +20,11 @@ namespace Godelian.Endpoints.Client.IPAddressing
     internal static class IPAddresingEndpoints
     {
         private const int AddressStepSize = 1024 * 4;
+
+        // Local cache for next-start index to avoid querying DB for every request
+        private static readonly SemaphoreSlim NextIndexLock = new(1, 1);
+        private static int? CachedIteration = null;
+        private static ulong? NextStartIndex = null;
 
         private static async Task<IPBatch?> GetStaleIPBatch(int currentIteration)
         {
@@ -32,25 +38,41 @@ namespace Godelian.Endpoints.Client.IPAddressing
 
         private static async Task<IPBatch> GetNextIPBatch(string clientId, int currentIteration)
         {
-            IPBatch? latestBatch = await DB.Find<IPBatch>()
-                                      .Match(x=>x.Iteration == currentIteration)
-                                      .Sort(x => x.ID, Order.Descending)
-                                      .ExecuteFirstAsync();
-
-            ulong nextStart = latestBatch != null ? latestBatch.Start + latestBatch.Count : IPAddressEnumerator.FirstIPIndex;
-
-            return new IPBatch
+            await NextIndexLock.WaitAsync();
+            try
             {
-                IssuedToClientId = clientId,
-                Start = nextStart,
-                Count = AddressStepSize,
-                Iteration = currentIteration,
-                StartIP = IPAddressEnumerator.GetIndexAsIP(nextStart),
-                EndIP = IPAddressEnumerator.GetIndexAsIP(nextStart + AddressStepSize - 1),
-                IssuedAt = DateTime.UtcNow,
-                Completed = false,
-                CompletedAt = null
-            };
+                // Initialize cache for iteration if needed
+                if (CachedIteration != currentIteration || !NextStartIndex.HasValue)
+                {
+                    IPBatch? latestBatch = await DB.Find<IPBatch>()
+                                              .Match(x => x.Iteration == currentIteration)
+                                              .Sort(x => x.ID, Order.Descending)
+                                              .ExecuteFirstAsync();
+
+                    NextStartIndex = latestBatch != null ? latestBatch.Start + latestBatch.Count : IPAddressEnumerator.FirstIPIndex;
+                    CachedIteration = currentIteration;
+                }
+
+                ulong nextStart = NextStartIndex!.Value;
+                NextStartIndex = nextStart + (ulong)AddressStepSize;
+
+                return new IPBatch
+                {
+                    IssuedToClientId = clientId,
+                    Start = nextStart,
+                    Count = AddressStepSize,
+                    Iteration = currentIteration,
+                    StartIP = IPAddressEnumerator.GetIndexAsIP(nextStart),
+                    EndIP = IPAddressEnumerator.GetIndexAsIP(nextStart + (ulong)AddressStepSize - 1),
+                    IssuedAt = DateTime.UtcNow,
+                    Completed = false,
+                    CompletedAt = null
+                };
+            }
+            finally
+            {
+                NextIndexLock.Release();
+            }
         }
 
         private static async Task<IPBatch?> MaybeValidateIPBatch(string clientID, int currentIteration)
@@ -101,6 +123,7 @@ namespace Godelian.Endpoints.Client.IPAddressing
                     IPBatchID = batchToValidate.ID,
                     Count = batchToValidate.Count,
                     Start = batchToValidate.Start,
+                    Iteration = currentIteration,
                     IsValidation = true
                 };
 
@@ -121,6 +144,7 @@ namespace Godelian.Endpoints.Client.IPAddressing
                         IPBatchID = staleBatch.ID,
                         Count = staleBatch.Count,
                         Start = staleBatch.Start,
+                        Iteration = currentIteration,
                         IsValidation = false
                     };
 
@@ -137,6 +161,7 @@ namespace Godelian.Endpoints.Client.IPAddressing
                         IPBatchID = nextBatch.ID,
                         Count = nextBatch.Count,
                         Start = nextBatch.Start,
+                        Iteration = currentIteration,
                         IsValidation = false
                     };
 
@@ -157,6 +182,18 @@ namespace Godelian.Endpoints.Client.IPAddressing
                         };
 
                         await newIteration.SaveAsync();
+
+                        // Reset local index cache for the new iteration
+                        await NextIndexLock.WaitAsync();
+                        try
+                        {
+                            CachedIteration = newIteration.Iteration;
+                            NextStartIndex = IPAddressEnumerator.FirstIPIndex;
+                        }
+                        finally
+                        {
+                            NextIndexLock.Release();
+                        }
 
                         ProgressEstimator.Reset();
                     }

@@ -74,7 +74,7 @@ namespace Godelian.Client
 
                 await Parallel.ForEachAsync(ipSequence, parallelOptions, async (kvp, ct) =>
                 {
-                    HostRecordModel? host = await new HostFetcher(kvp.Key, kvp.Value).Fetch();
+                    HostRecordModel? host = await new HostFetcher(kvp.Key, kvp.Value, newIPRange.Data.Iteration).Fetch();
                     if (host != null)
                     {
                         results.Add(host);

@@ -10,6 +10,7 @@ namespace Godelian.Models
     internal class HostRecordModel : Entity
     {
         public ulong IPIndex { get; set; }
+        public int Iteration { get; set; }
         public required string IPAddress { get; set; }
         public required string Hostname { get; set; }
         public required string FoundByClientId { get; set; }

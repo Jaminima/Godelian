@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ClientRequestDto, ClientRequestType } from '../types/ClientRequest.dto';
+import { HostRecord } from '../types/HostRecord.dto';
 import { IPDistributionStatsDto } from '../types/IPDistributionStats.dto';
 import { ProgressStatsDto } from '../types/ProgressStats.dto';
 import { RecentClientsDto } from '../types/RecentClients.dto';
@@ -64,5 +65,9 @@ export class ApiService {
       RequestType: ClientRequestType.IPDistributionStats,
       Data: { NumBuckets: numBuckets }
     });
+  }
+
+  getRandomRecord(): Observable<ServerResponseDto<HostRecord>> {
+    return this.sendRequest<null, HostRecord>({ RequestType: ClientRequestType.GetRandomRecord });
   }
 }

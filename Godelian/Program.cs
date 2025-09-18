@@ -3,6 +3,7 @@ using Godelian.Helpers;
 using Godelian.Models;
 using Godelian.Networking;
 using Godelian.Networking.DTOs;
+using Godelian.Services;
 using MongoDB.Driver;
 using MongoDB.Entities;
 using System.Net.NetworkInformation;
@@ -53,9 +54,13 @@ namespace GodelianAPI
                     }
                 }
 
+                IterationTracker iteration = IterationService.GetCurrentIteration().Result;
+                int currentIteration = iteration.Iteration;
+
                 IPBatch? latestBatch = DB.Find<IPBatch>()
-                                          .Sort(x => x.Start, Order.Descending)
-                                          .ExecuteFirstAsync().Result;
+                        .Match(x=>x.Iteration == currentIteration)
+                        .Sort(x => x.Start, Order.Descending)
+                        .ExecuteFirstAsync().Result;
 
                 ProgressEstimator.Init(latestBatch != null ? (ulong)(latestBatch.Start + latestBatch.Count) : IPAddressEnumerator.FirstIPIndex);
 

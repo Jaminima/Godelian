@@ -26,11 +26,6 @@ echo \
 sudo apt-get update
 
 sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
-
-docker node ls
-
-docker service scale <service>=<N>
-docker stack deploy -c docker-deploy.yml hell
 ```
 
 2. Set the hostname

@@ -1,6 +1,8 @@
 ﻿using Godelian.Endpoints.Web.Search.DTOs;
 using Godelian.Models;
 using Godelian.Networking.DTOs;
+using Godelian.Services;
+using MongoDB.Driver;
 using MongoDB.Entities;
 using System;
 using System.Collections.Generic;
@@ -27,6 +29,33 @@ namespace Godelian.Endpoints.Web.Search
             {
                 Success = true,
                 Data = new SearchResults { hostRecords = indexes.ToArray() }
+            };
+        }
+
+        public static async Task<ServerResponse<HostRecordModel>> GetRandomRecord(ClientRequest<object> clientRequest)
+        {
+            IterationTracker iteration = await IterationService.GetCurrentIteration();
+            int currentIteration = iteration.Iteration;
+
+            var record = await DB.Collection<HostRecordModel>()
+                                 .Aggregate()
+                                 .Match(x=>x.Iteration == currentIteration)
+                                 .Sample(1)
+                                 .FirstOrDefaultAsync();
+
+            if (record is null)
+            {
+                return new ServerResponse<HostRecordModel>
+                {
+                    Success = false,
+                    Message = "No records found"
+                };
+            }
+
+            return new ServerResponse<HostRecordModel>
+            {
+                Success = true,
+                Data = record
             };
         }
     }

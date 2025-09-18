@@ -23,11 +23,13 @@ namespace Godelian.Helpers
 
         ulong IPIndex;
         string IPAddress;
+        int Iteration;
 
-        public HostFetcher(ulong IPIndex, string IPAddress)
+        public HostFetcher(ulong IPIndex, string IPAddress, int iteration)
         {
             this.IPIndex = IPIndex;
             this.IPAddress = IPAddress;
+            this.Iteration = iteration;
         }
 
         public static void SetTimeout(int seconds)
@@ -53,6 +55,7 @@ namespace Godelian.Helpers
                 {
                     IPIndex = this.IPIndex,
                     IPAddress = this.IPAddress,
+                    Iteration = this.Iteration,
                     Hostname = response.RequestMessage?.RequestUri?.Host ?? "",
                     FoundByClientId = Client.ClientState.ClientID!,
                     Features = ExtractFeatures(responseBody),
