@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using System.Text.Json.Nodes;
 using System.Text.Json;
 using Godelian.Networking.DTOs;
-using Godelian.Endpoints;
+using Godelian.Server.Endpoints;
 
 namespace Godelian.Networking
 {

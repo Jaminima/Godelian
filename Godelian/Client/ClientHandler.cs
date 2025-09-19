@@ -1,10 +1,10 @@
-﻿using Godelian.Endpoints.Client.Connection.DTOs;
-using Godelian.Endpoints.Client.HostRecords.DTOs;
-using Godelian.Endpoints.Client.IPAddressing.DTOs;
-using Godelian.Helpers;
+﻿using Godelian.Helpers;
 using Godelian.Models;
 using Godelian.Networking;
 using Godelian.Networking.DTOs;
+using Godelian.Server.Endpoints.Client.Connection.DTOs;
+using Godelian.Server.Endpoints.Client.HostRecords.DTOs;
+using Godelian.Server.Endpoints.Client.IPAddressing.DTOs;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;

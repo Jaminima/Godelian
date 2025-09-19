@@ -3,16 +3,18 @@
     internal enum ClientRequestType
     {
         // Client
-        Connect,
-        Disconnect,
-        NewIpRange,
-        SubmitIpRange,
+        Connect = 100,
+        Disconnect = 101,
+        NewIpRange = 102,
+        SubmitIpRange = 103,
+        NewFeatureRange = 104,
+        SubmitFeatureRange = 105,
 
         // Web
-        ProgressStats,
-        SearchRecords,
-        RecentlyActiveClients,
-        IPDistributionStats,
-        GetRandomRecord
+        ProgressStats =200,
+        SearchRecords=201,
+        RecentlyActiveClients=202,
+        IPDistributionStats=203,
+        GetRandomRecord=204
     }
 }

@@ -3,7 +3,7 @@ using Godelian.Helpers;
 using Godelian.Models;
 using Godelian.Networking;
 using Godelian.Networking.DTOs;
-using Godelian.Services;
+using Godelian.Server;
 using MongoDB.Driver;
 using MongoDB.Entities;
 using System.Net.NetworkInformation;
@@ -62,7 +62,7 @@ namespace GodelianAPI
                         .Sort(x => x.Start, Order.Descending)
                         .ExecuteFirstAsync().Result;
 
-                ProgressEstimator.Init(latestBatch != null ? (ulong)(latestBatch.Start + latestBatch.Count) : IPAddressEnumerator.FirstIPIndex);
+                ProgressEstimatorService.Init(latestBatch != null ? (ulong)(latestBatch.Start + latestBatch.Count) : IPAddressEnumerator.FirstIPIndex);
 
                 httpServer = new HTTPServer(9000);
                 _ = httpServer.Start();
@@ -78,13 +78,13 @@ namespace GodelianAPI
             while (true) {
                 if (Config.IsServer)
                 {
-                    TimeSpan remaining = ProgressEstimator.EstimateTimeRemaining();
+                    TimeSpan remaining = ProgressEstimatorService.EstimateTimeRemaining();
 
                     string remainingText = remaining.TotalDays >= 1
                         ? remaining.ToString(@"d\.hh\:mm\:ss")
                         : remaining.ToString(@"hh\:mm\:ss");
 
-                    Console.WriteLine($"Progress: {ProgressEstimator.GetPercentageProgress():0.000}% | Est: {remainingText} | Current IP: {IPAddressEnumerator.GetIndexAsIP(ProgressEstimator.CurrentIndex)}");
+                    Console.WriteLine($"Progress: {ProgressEstimatorService.GetPercentageProgress():0.000}% | Est: {remainingText} | Current IP: {IPAddressEnumerator.GetIndexAsIP(ProgressEstimatorService.CurrentIndex)}");
                 }
 
                 Thread.Sleep(20000);
