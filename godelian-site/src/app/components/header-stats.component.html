@@ -13,7 +13,7 @@
         <li *ngFor="let header of headerNames" class="list-group-item d-flex align-items-center">
           <span class="flex-grow-1">{{ header.Name }}</span>
           <div class="d-flex align-items-center">
-            <span class="badge bg-primary rounded-pill me-2">{{ header.Count }}</span>
+            <span class="badge bg-primary rounded-pill me-2">{{ header.Count | number }}</span>
             <button class="btn btn-sm btn-outline-primary" (click)="loadHeaderValues(header.Name)">View Values</button>
           </div>
         </li>
@@ -27,7 +27,7 @@
       <ul class="list-group">
         <li *ngFor="let value of headerValues" class="list-group-item d-flex justify-content-between align-items-center">
           {{ value.Value }}
-          <span class="badge bg-success rounded-pill">{{ value.Count }}</span>
+          <span class="badge bg-success rounded-pill">{{ value.Count | number }}</span>
         </li>
       </ul>
     </div>
