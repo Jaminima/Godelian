@@ -1,0 +1,71 @@
+// All styling is now handled by Bootstrap
+// Component-specific customizations can be added here if needed
+
+// Status indicators for server state
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-indicator.active {
+  background: #10b981;
+  animation: pulse 2s infinite;
+}
+
+.status-indicator.idle {
+  background: #f59e0b;
+}
+
+.status-indicator.offline {
+  background: #ef4444;
+}
+
+// Pulse animation for active status indicator
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.progress-label {
+  font-weight: 500;
+  color: #374151;
+}
+
+.progress-value {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #0ea5e9;
+}
+
+// Spinning animation for refresh icon
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.refresh-icon {
+  animation: spin 2s linear infinite;
+}
+
+// Custom progress bar styling
+.progress-bar-custom {
+  height: 8px;
+  border-radius: 4px;
+  background-color: #e5e7eb;
+  overflow: hidden;
+}
+
+.progress-fill-custom {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #059669);
+  border-radius: 4px;
+  transition: width 0.5s ease-in-out;
+}

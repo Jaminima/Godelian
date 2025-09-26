@@ -1,0 +1,39 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36408.4
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docker", "Docker", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+	ProjectSection(SolutionItems) = preProject
+		docker-compose.yml = docker-compose.yml
+		docker-deploy.yml = docker-deploy.yml
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Godelian", "Godelian\Godelian.csproj", "{1DD9C06C-E819-42E3-4959-FBB270B37AFC}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{8EC462FD-D22E-90A8-E5CE-7E832BA40C5D}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		gcloud-init.sh = gcloud-init.sh
+		README.md = README.md
+		vm-init.sh = vm-init.sh
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1DD9C06C-E819-42E3-4959-FBB270B37AFC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1DD9C06C-E819-42E3-4959-FBB270B37AFC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1DD9C06C-E819-42E3-4959-FBB270B37AFC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1DD9C06C-E819-42E3-4959-FBB270B37AFC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8020E245-CA91-4F26-A14A-B42A621B6DC3}
+	EndGlobalSection
+EndGlobal

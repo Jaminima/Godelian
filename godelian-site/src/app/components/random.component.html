@@ -1,0 +1,37 @@
+<div class="card">
+  <div class="card-body">
+    <h2 class="card-title">Random Host Record</h2>
+
+    <button class="btn btn-primary me-2" (click)="fetchRandom()" [disabled]="loading">
+      {{ loading ? 'Loading...' : 'Get Random Record' }}
+    </button>
+    <button class="btn btn-success" (click)="openLucky()" [disabled]="!record">
+      View Website
+    </button>
+
+    <div *ngIf="errorMsg" class="alert alert-danger mt-3">
+      {{ errorMsg }}
+    </div>
+
+    <div *ngIf="record" class="mt-3">
+      <p><strong>IP Address:</strong> {{ record.IPAddress }}</p>
+      <p><strong>Hostname:</strong> {{ record.Hostname }}</p>
+      <p><strong>Found By Client:</strong> {{ record.FoundByClientId }}</p>
+      <p><strong>Found At:</strong> {{ record.FoundAt | date:'short' }}</p>
+
+      <h5>Headers:</h5>
+      <ul>
+        <li *ngFor="let header of record.HeaderRecords">
+          [{{ header.Name }}] {{ header.Value }}
+        </li>
+      </ul>
+
+      <h5>Features:</h5>
+      <ul>
+        <li *ngFor="let feature of record.Features">
+          [{{ feature.Type }}] {{ feature.Content }}
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>

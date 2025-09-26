@@ -1,0 +1,66 @@
+services:
+
+  godelian-server-v2:
+    build: ./Godelian
+    image: jaminima/godelian-v2:latest
+    container_name: godelian-v2-server
+    ports:
+      - "9000:9000"
+    environment:
+      - DOTNET_ENVIRONMENT=Production
+      - MONGO_IP=mongodb
+      - MONGO_PORT=27017
+      - MONGO_USERNAME=root
+      - MONGO_PASSWORD=changeme
+      - GODELIAN_IS_SERVER=TRUE
+      - GODELIAN_SERVER_PORT=9000
+      - GODELIAN_NICKNAME=Server
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+    profiles: ["server"]
+
+  godelian-frontend-v2:
+    build: ./godelian-site
+    image: jaminima/godelian-v2-frontend:latest
+    container_name: godelian-v2-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: unless-stopped
+    profiles: ["server"]
+    depends_on:
+      - godelian-server-v2
+    volumes:
+      - ./godelian-site/ssl/pri.key:/etc/ssl/pri.key:ro
+      - ./godelian-site/ssl/pub.cer:/etc/ssl/pub.cer:ro
+
+  mongodb:
+    image: mongo:7
+    ports:
+      - "100.73.169.56:27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=godelian
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=changeme
+    command: ["mongod", "--bind_ip_all"]
+    restart: unless-stopped
+    profiles: ["server"]
+
+  godelian-client-v2:
+    build: ./Godelian
+    image: jaminima/godelian-v2:latest
+    container_name: godelian-v2-client
+    environment:
+      - DOTNET_ENVIRONMENT=Production
+      - GODELIAN_IS_SERVER=FALSE
+      - GODELIAN_SERVER_IP=100.73.169.56
+      - GODELIAN_SERVER_PORT=9000
+      - GODELIAN_NICKNAME=TestClient
+    restart: unless-stopped
+    profiles: ["client"]
+
+volumes:
+  mongodb_data:

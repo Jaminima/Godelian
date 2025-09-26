@@ -1,0 +1,18 @@
+services:
+  godelian-client-v2:
+    image: jaminima/godelian-v2:latest
+    deploy:
+      mode: replicated
+      replicas: 135
+      placement:
+        max_replicas_per_node: 5
+        preferences:
+          - spread: node.id
+    environment:
+      - DOTNET_ENVIRONMENT=Production
+      - GODELIAN_IS_SERVER=FALSE
+      - GODELIAN_SERVER_IP=100.73.169.56
+      - GODELIAN_SERVER_PORT=9000
+      - GODELIAN_NICKNAME=angel-{{.Node.Hostname}}
+      - GODELIAN_TASK_SLOT={{.Task.Slot}}
+      - GODELIAN_MAX_CONCURRENT_FETCHES=256

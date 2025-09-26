@@ -1,0 +1,119 @@
+<div class="container mt-4">
+  <div class="row mb-4">
+    <div class="col-12 text-center">
+      <h2 class="display-4 text-success">Godelian Statistics Dashboard</h2>
+      <p class="lead">Real-time monitoring of HTTP mapping progress</p>
+    </div>
+  </div>
+
+  <!-- Server Offline Card (when there's an error) -->
+  <div *ngIf="errorMessage()" class="row mb-4">
+    <div class="col-12">
+      <div class="card border-danger">
+        <div class="card-header bg-danger bg-opacity-10 d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">Server Status</h5>
+          <div class="status-indicator offline"></div>
+        </div>
+        <div class="card-body text-center py-5">
+          <i class="fas fa-exclamation-triangle fa-3x text-danger mb-3"></i>
+          <h4>Server Offline</h4>
+          <p class="text-muted">{{ errorMessage() }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- IP Distribution Chart -->
+  <div class="row mb-4" *ngIf="ipDistribution() && ipDistribution()!.length > 0">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">IP Distribution</h5>
+          <div class="d-flex align-items-center">
+            <label for="bucketSelect" class="me-2 mb-0 small text-muted">Buckets</label>
+            <select id="bucketSelect" class="form-select form-select-sm" (change)="onBucketsChange($event)" [value]="selectedBuckets()">
+              <option *ngFor="let b of bucketOptions" [value]="b" [selected]="b===selectedBuckets()">{{ b }}</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-body" style="height:320px; position:relative;">
+          <canvas baseChart
+                  *ngIf="barChartData?.labels?.length"
+                  [data]="barChartData"
+                  [options]="barChartOptions"
+                  [type]="'bar'"
+                  class="w-100 h-100"
+                  #ipDistCanvas>
+          </canvas>
+          <div *ngIf="!barChartData?.labels?.length" class="d-flex align-items-center justify-content-center h-100 text-muted">
+            No distribution data available
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="stats()" class="row row-cols-1 g-4 mb-4">
+    <!-- Live Server Stats -->
+    <div *ngIf="stats()?.Data" class="col-12">
+      <div class="card border-info shadow-sm">
+        <div class="card-header bg-info bg-opacity-10 d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">Live Server Status</h5>
+          <div class="status-indicator active"></div>
+        </div>
+        <div class="card-body p-4">
+          <div class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span>Progress</span>
+              <span class="badge bg-info">{{ stats()?.Data?.PercentageComplete | number: '0.2' }}%</span>
+            </div>
+            <div class="progress-bar-custom">
+              <div class="progress-fill-custom" 
+                [style.width.%]="stats()?.Data?.PercentageComplete"></div>
+            </div>
+            <div class="text-center mt-1 small">
+                {{ (stats()?.Data?.CurrentIPIndex | number ) }} / {{ 4294967294 | number }} IPs
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Total Results -->
+    <div class="col">
+      <div class="card h-100 shadow-sm">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">Total Results</h5>
+          <i class="fas fa-chart-bar text-primary"></i>
+        </div>
+        <div class="card-body text-center py-4">
+          <h2 class="display-5 fw-bold text-primary mb-2">{{ stats()?.Data?.FoundHosts | number }}</h2>
+          <p class="text-muted mb-0">HTTP responses discovered</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Last Updated -->
+    <div class="col">
+      <div class="card h-100 shadow-sm">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">Estimated Time Remaining</h5>
+          <i class="fas fa-clock text-info"></i>
+        </div>
+        <div class="card-body text-center py-4">
+          <h2 class="display-5 fw-bold text-info mb-2">{{ stats()?.Data?.EstimatedTimeRemaining  }}</h2>
+          <p class="text-muted mb-0">This may be inaccurate if the server recently restarted or if there has been a change to the number of clients.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="stats()" class="row mt-3">
+    <div class="col-12 text-center">
+      <small class="text-muted">
+        <i class="fas fa-sync refresh-icon me-1"></i>
+        Auto-refreshing every 60 seconds
+      </small>
+    </div>
+  </div>
+</div>

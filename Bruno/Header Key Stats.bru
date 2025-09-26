@@ -1,0 +1,20 @@
+meta {
+  name: Header Key Stats
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://100.73.169.56:9000/
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "RequestType":206,
+    "Data":{
+      "TopN": 100
+    }
+  }
+}

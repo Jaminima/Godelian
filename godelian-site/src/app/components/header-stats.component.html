@@ -1,0 +1,35 @@
+<div class="card">
+  <div class="card-body">
+    <h2 class="card-title">Header Statistics</h2>
+
+    <div *ngIf="errorMsg" class="alert alert-danger mt-3">
+      {{ errorMsg }}
+    </div>
+
+    <div *ngIf="!selectedHeader">
+      <h3>Top 100 Header Names</h3>
+      <div *ngIf="loading" class="text-center">Loading...</div>
+      <ul class="list-group">
+        <li *ngFor="let header of headerNames" class="list-group-item d-flex align-items-center">
+          <span class="flex-grow-1">{{ header.Name }}</span>
+          <div class="d-flex align-items-center">
+            <span class="badge bg-primary rounded-pill me-2">{{ header.Count }}</span>
+            <button class="btn btn-sm btn-outline-primary" (click)="loadHeaderValues(header.Name)">View Values</button>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div *ngIf="selectedHeader">
+      <h3>Top 100 Values for "{{ selectedHeader }}"</h3>
+      <button class="btn btn-secondary mb-3" (click)="backToNames()">Back to Header Names</button>
+      <div *ngIf="loading" class="text-center">Loading...</div>
+      <ul class="list-group">
+        <li *ngFor="let value of headerValues" class="list-group-item d-flex justify-content-between align-items-center">
+          {{ value.Value }}
+          <span class="badge bg-success rounded-pill">{{ value.Count }}</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>

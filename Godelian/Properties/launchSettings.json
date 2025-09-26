@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    },
+    "Godelian": {
+      "commandName": "Project"
+    }
+  }
+}
