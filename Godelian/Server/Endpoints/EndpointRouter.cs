@@ -17,6 +17,7 @@ using Godelian.Server.Endpoints.Client.FeatureRange;
 using Godelian.Server.Endpoints.Client.FeatureRange.DTOs;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using System.Threading;
 
 namespace Godelian.Server.Endpoints
 {
@@ -28,10 +29,35 @@ namespace Godelian.Server.Endpoints
         {
             // Web/statistics endpoints
             { ClientRequestType.ProgressStats, TimeSpan.FromMinutes(1) },
-            { ClientRequestType.RecentlyActiveClients, TimeSpan.FromMinutes(5) },
+            { ClientRequestType.RecentlyActiveClients, TimeSpan.FromMinutes(1) },
             { ClientRequestType.IPDistributionStats, TimeSpan.FromMinutes(10) },
             { ClientRequestType.HeaderNamesStats, TimeSpan.FromMinutes(10) },
             { ClientRequestType.HeaderValuesStats, TimeSpan.FromMinutes(10) }
+        };
+
+        // Define a set of client requests to keep a warm copy of.
+        private sealed class WarmRequestSpec
+        {
+            public required ClientRequestType RequestType { get; init; }
+            public object? Data { get; init; }
+        }
+
+        private static readonly WarmRequestSpec[] WarmRequests = new[]
+        {
+            // Keep these frequently requested endpoints warm
+            new WarmRequestSpec { RequestType = ClientRequestType.ProgressStats, Data = null },
+            new WarmRequestSpec { RequestType = ClientRequestType.RecentlyActiveClients, Data = null },
+
+            new WarmRequestSpec { RequestType = ClientRequestType.IPDistributionStats, Data = new IPDistributionStats { NumBuckets = 64 } },
+            new WarmRequestSpec { RequestType = ClientRequestType.IPDistributionStats, Data = new IPDistributionStats { NumBuckets = 128 } },
+            new WarmRequestSpec { RequestType = ClientRequestType.IPDistributionStats, Data = new IPDistributionStats { NumBuckets = 256 } },
+            new WarmRequestSpec { RequestType = ClientRequestType.IPDistributionStats, Data = new IPDistributionStats { NumBuckets = 512 } },
+            new WarmRequestSpec { RequestType = ClientRequestType.IPDistributionStats, Data = new IPDistributionStats { NumBuckets = 1024 } },
+
+            new WarmRequestSpec { RequestType = ClientRequestType.HeaderNamesStats, Data = new HeaderStatsRequest { TopN = 100 } },
+            new WarmRequestSpec { RequestType = ClientRequestType.HeaderValuesStats, Data = new HeaderValueStatsRequest { HeaderName = "Server", TopN = 100 } },
+            // Add more here; if an endpoint requires a payload, set Data accordingly.
+            // new WarmRequestSpec { RequestType = ClientRequestType.IPDistributionStats, Data = new IPDistributionStats { ... } },
         };
 
         private sealed class CacheEntry
@@ -41,6 +67,10 @@ namespace Godelian.Server.Endpoints
         }
 
         private static readonly ConcurrentDictionary<string, CacheEntry> ResponseCache = new();
+
+        // Background warming loop
+        private static readonly CancellationTokenSource warmCts = new();
+        private static readonly Task warmLoopTask = RunWarmLoopAsync(warmCts.Token);
 
         // Route based on request type and convert payloads as needed
         public static async Task<ServerResponse> RouteRequest(ClientRequest<object> clientRequest)
@@ -57,27 +87,7 @@ namespace Godelian.Server.Endpoints
                 }
             }
 
-            ServerResponse response = clientRequest.RequestType switch
-            {
-                //Client
-                ClientRequestType.Connect => await ConnectionEndpoints.ClientConnects(clientRequest),
-                ClientRequestType.NewIpRange => await IPAddresingEndpoints.GetNewIPRange(clientRequest),
-                ClientRequestType.SubmitIpRange => await HostRecordEndpoints.SubmitHostRecords(ConvertPayload<SubmitHostRecordsRequest>(clientRequest)),
-                ClientRequestType.NewFeatureRange => await FeatureRangeEndpoints.GetFeatureRange(clientRequest),
-                ClientRequestType.SubmitFeatureRange => await FeatureRangeEndpoints.SubmitFeatureRanges(ConvertPayload<FeatureRangeCollection>(clientRequest)),
-
-                //Web
-                ClientRequestType.ProgressStats => await StatisticsEndpoints.ProgressStatistics(clientRequest),
-                //ClientRequestType.SearchRecords => await SearchEndpoints.SearchRecords(ConvertPayload<SearchQuery>(clientRequest)),
-                ClientRequestType.RecentlyActiveClients => await StatisticsEndpoints.GetRecentlyActiveClients(clientRequest),
-                ClientRequestType.IPDistributionStats => await StatisticsEndpoints.GetIPDistributionStats(ConvertPayload<IPDistributionStats>(clientRequest)),
-                ClientRequestType.GetRandomRecord => await RandomHostRecordEndpoint.GetRandomRecord(clientRequest),
-                ClientRequestType.GetRandomImage => await RandomImageFeatureEndpoint.GetRandomImageFeature(clientRequest),
-                ClientRequestType.HeaderNamesStats => await HeaderStatisticsEndpoints.GetTopHeaderNames(ConvertPayload<HeaderStatsRequest>(clientRequest)),
-                ClientRequestType.HeaderValuesStats => await HeaderStatisticsEndpoints.GetTopHeaderValues(ConvertPayload<HeaderValueStatsRequest>(clientRequest)),
-
-                _ => new ServerResponse { Success = false, Message = "Unknown request type." }
-            };
+            ServerResponse response = await ExecuteEndpointAsync(clientRequest);
 
             if (cacheable && cacheKey is not null && response.Success)
             {
@@ -85,6 +95,45 @@ namespace Godelian.Server.Endpoints
             }
 
             return response;
+        }
+
+        // Centralized endpoint execution so the warmer can reuse it without cache recursion
+        private static async Task<ServerResponse> ExecuteEndpointAsync(ClientRequest<object> clientRequest)
+        {
+            switch (clientRequest.RequestType)
+            {
+                // Client
+                case ClientRequestType.Connect:
+                    return await ConnectionEndpoints.ClientConnects(clientRequest);
+                case ClientRequestType.NewIpRange:
+                    return await IPAddresingEndpoints.GetNewIPRange(clientRequest);
+                case ClientRequestType.SubmitIpRange:
+                    return await HostRecordEndpoints.SubmitHostRecords(ConvertPayload<SubmitHostRecordsRequest>(clientRequest));
+                case ClientRequestType.NewFeatureRange:
+                    return await FeatureRangeEndpoints.GetFeatureRange(clientRequest);
+                case ClientRequestType.SubmitFeatureRange:
+                    return await FeatureRangeEndpoints.SubmitFeatureRanges(ConvertPayload<FeatureRangeCollection>(clientRequest));
+
+                // Web
+                case ClientRequestType.ProgressStats:
+                    return await StatisticsEndpoints.ProgressStatistics(clientRequest);
+                //case ClientRequestType.SearchRecords:
+                //    return await SearchEndpoints.SearchRecords(ConvertPayload<SearchQuery>(clientRequest));
+                case ClientRequestType.RecentlyActiveClients:
+                    return await StatisticsEndpoints.GetRecentlyActiveClients(clientRequest);
+                case ClientRequestType.IPDistributionStats:
+                    return await StatisticsEndpoints.GetIPDistributionStats(ConvertPayload<IPDistributionStats>(clientRequest));
+                case ClientRequestType.GetRandomRecord:
+                    return await RandomHostRecordEndpoint.GetRandomRecord(clientRequest);
+                case ClientRequestType.GetRandomImage:
+                    return await RandomImageFeatureEndpoint.GetRandomImageFeature(clientRequest);
+                case ClientRequestType.HeaderNamesStats:
+                    return await HeaderStatisticsEndpoints.GetTopHeaderNames(ConvertPayload<HeaderStatsRequest>(clientRequest));
+                case ClientRequestType.HeaderValuesStats:
+                    return await HeaderStatisticsEndpoints.GetTopHeaderValues(ConvertPayload<HeaderValueStatsRequest>(clientRequest));
+                default:
+                    return new ServerResponse { Success = false, Message = "Unknown request type." };
+            }
         }
 
         private static ClientRequest<T> ConvertPayload<T>(ClientRequest<object> request) where T : class
@@ -145,6 +194,22 @@ namespace Godelian.Server.Endpoints
             return true;
         }
 
+        private static bool TryGetCacheEntry(string key, out CacheEntry? entry)
+        {
+            if (ResponseCache.TryGetValue(key, out entry))
+            {
+                if (entry.ExpiresAt <= DateTimeOffset.UtcNow)
+                {
+                    ResponseCache.TryRemove(key, out _);
+                    entry = null;
+                    return false;
+                }
+                return true;
+            }
+            entry = null;
+            return false;
+        }
+
         private static void SetCached(string key, ServerResponse response, TimeSpan ttl)
         {
             ResponseCache[key] = new CacheEntry
@@ -187,6 +252,65 @@ namespace Godelian.Server.Endpoints
             {
                 // Fallback to ToString if serialization fails
                 return data.ToString() ?? "null";
+            }
+        }
+
+        private static async Task RunWarmLoopAsync(CancellationToken token)
+        {
+            // Small tick to check if any warm entries need refreshing
+            TimeSpan checkInterval = TimeSpan.FromSeconds(5);
+
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    foreach (var spec in WarmRequests)
+                    {
+                        if (!CachePolicies.TryGetValue(spec.RequestType, out TimeSpan ttl))
+                            continue; // only warm cacheable endpoints
+
+                        var req = new ClientRequest<object>
+                        {
+                            RequestType = spec.RequestType,
+                            ClientId = null,
+                            ClientNickname = null,
+                            TaskId = null,
+                            Data = spec.Data
+                        };
+
+                        string key = BuildCacheKey(req);
+
+                        bool needsRefresh = true;
+                        if (TryGetCacheEntry(key, out CacheEntry? entry))
+                        {
+                            // Refresh a bit before expiry to keep it warm
+                            var remaining = entry!.ExpiresAt - DateTimeOffset.UtcNow;
+                            needsRefresh = remaining <= TimeSpan.FromSeconds(Math.Max(5, ttl.TotalSeconds * 0.1));
+                        }
+
+                        if (needsRefresh)
+                        {
+                            ServerResponse resp = await ExecuteEndpointAsync(req);
+                            if (resp.Success)
+                            {
+                                SetCached(key, resp, ttl);
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    // swallow warming errors; they'll be retried on next tick
+                }
+
+                try
+                {
+                    await Task.Delay(checkInterval, token);
+                }
+                catch (TaskCanceledException)
+                {
+                    // exiting
+                }
             }
         }
     }
