@@ -172,31 +172,34 @@ namespace Godelian.Server.Endpoints.Client.FeatureRange
 
         public static async Task<ServerResponse> SubmitFeatureRanges(ClientRequest<FeatureRangeCollection> clientRequest)
         {
+
+            List<string> parentFeatureIDs = clientRequest.Data!.featureRecords.Select(x => x.ID!).Distinct().ToList();
+            List<Feature> parentFeatures = await DB.Find<Feature>().ManyAsync(x => parentFeatureIDs.Contains(x.ID));
+
+            List<Feature> newFeatures = new List<Feature>();
+
             foreach (FeatureDTO feature in clientRequest.Data!.featureRecords)
             {
-                Feature parentFeature = await DB.Find<Feature>().OneAsync(feature.ParentFeature.ID);
+                Feature parentFeature = parentFeatures.First(pf => pf.ID == feature.ID);
 
                 Feature record = new Feature
                 {
                     Content = feature.Content,
                     Base64Content = feature.Base64Content,
                     Type = feature.Type,
-                    HostRecordID = parentFeature!.HostRecordID,
-                    ParentFeatureID = parentFeature!.ID
+                    HostRecordID = parentFeature.HostRecordID,
+                    ParentFeatureID = parentFeature.ID
                 };
 
-                parentFeature.Elaborated = true;
-                await parentFeature.SaveAsync();
-
-                try
-                {
-                    await record.SaveAsync();
-                }
-                catch (BsonSerializationException ex)
-                {
-                    //Record was too big so lets just not save it
-                }
+                newFeatures.Add(record);
             }
+
+            foreach (Feature feature in parentFeatures)
+            {
+                feature.Elaborated = true;
+            }
+
+            await DB.SaveAsync(parentFeatures.Concat(newFeatures));
 
             Console.WriteLine($"Client '{clientRequest.ClientNickname}' submitted features for {clientRequest.Data.featureRecords.Length} records");
 
