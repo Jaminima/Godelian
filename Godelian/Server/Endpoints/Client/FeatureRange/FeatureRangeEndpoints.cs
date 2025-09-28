@@ -199,7 +199,9 @@ namespace Godelian.Server.Endpoints.Client.FeatureRange
                 feature.Elaborated = true;
             }
 
-            await DB.SaveAsync(parentFeatures.Concat(newFeatures));
+            List<Feature> allToSave = parentFeatures.Concat(newFeatures).ToList();
+            if (allToSave.Count > 0)
+                await DB.SaveAsync(allToSave);
 
             Console.WriteLine($"Client '{clientRequest.ClientNickname}' submitted features for {clientRequest.Data.featureRecords.Length} records");
 
