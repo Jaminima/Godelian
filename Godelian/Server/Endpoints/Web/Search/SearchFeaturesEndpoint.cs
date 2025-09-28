@@ -33,8 +33,11 @@ namespace Godelian.Server.Endpoints.Web.Search
                 Elaborated = f.Elaborated,
             }).ToArray();
 
+            string query = clientRequest.Data?.Query ?? string.Empty;
+
             foreach (var featureDTO in featureDTOs)
             {
+                // Attach virtual ParentFeature
                 Feature? parentFeature = parentFeatures.FirstOrDefault(pf => pf.ID == features.First(f => f.ID == featureDTO.ID).ParentFeatureID);
                 if (parentFeature != null)
                 {
@@ -47,6 +50,8 @@ namespace Godelian.Server.Endpoints.Web.Search
                         Elaborated = parentFeature.Elaborated,
                     };
                 }
+
+                // Attach HostRecord
                 HostRecordModel? hostRecord = hostRecords.FirstOrDefault(hr => hr.ID == features.First(f => f.ID == featureDTO.ID).HostRecordID);
                 if (hostRecord != null)
                 {
@@ -63,6 +68,20 @@ namespace Godelian.Server.Endpoints.Web.Search
                         HostRequestMethod = hostRecord.HostRequestMethod
                     };
                 }
+
+                // Build content snippets around the query for text-based features
+                if (!string.IsNullOrWhiteSpace(query))
+                {
+                    if (featureDTO.Type is FeatureType.Text or FeatureType.Title)
+                    {
+                        featureDTO.Content = BuildSnippet(featureDTO.Content, query);
+                    }
+
+                    if (featureDTO.ParentFeature != null && featureDTO.ParentFeature.Type is FeatureType.Text or FeatureType.Title)
+                    {
+                        featureDTO.ParentFeature.Content = BuildSnippet(featureDTO.ParentFeature.Content, query);
+                    }
+                }
             }
 
             return new ServerResponse<SearchResults>
@@ -76,5 +95,61 @@ namespace Godelian.Server.Endpoints.Web.Search
 
         }
 
+        private static string? BuildSnippet(string? content, string query, int context = 80)
+        {
+            if (string.IsNullOrEmpty(content)) return content;
+            if (string.IsNullOrWhiteSpace(query)) return content;
+
+            // Try to find the query or one of its tokens
+            (int index, int length) = FindFirstMatch(content, query);
+
+            if (index < 0)
+            {
+                // Fallback: return a head snippet if content is long
+                if (content.Length <= context * 2) return content;
+                return content[..(context * 2)] + "...";
+            }
+
+            int start = Math.Max(0, index - context);
+            int end = Math.Min(content.Length, index + length + context);
+
+            // Expand to word boundaries where possible
+            if (start > 0)
+            {
+                int prevSpace = content.LastIndexOf(' ', start - 1);
+                if (prevSpace >= 0) start = prevSpace + 1;
+            }
+            if (end < content.Length)
+            {
+                int nextSpace = content.IndexOf(' ', end);
+                if (nextSpace >= 0) end = nextSpace;
+            }
+
+            string snippet = content[start..end];
+
+            if (start > 0) snippet = "..." + snippet;
+            if (end < content.Length) snippet += "...";
+            snippet = snippet.Replace("\n", " ").Replace("\r", " "); // Remove new lines
+
+            return snippet;
+        }
+
+        private static (int index, int length) FindFirstMatch(string content, string query)
+        {
+            // Direct match first
+            int idx = content.IndexOf(query, StringComparison.OrdinalIgnoreCase);
+            if (idx >= 0) return (idx, query.Length);
+
+            // Try individual tokens (ignore very short tokens)
+            foreach (var token in query.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var t = token.Trim('"', '\'', ',', '.', ';', ':', '!', '?', '(', ')', '[', ']', '{', '}', '<', '>', '/', '\\');
+                if (t.Length < 2) continue;
+                idx = content.IndexOf(t, StringComparison.OrdinalIgnoreCase);
+                if (idx >= 0) return (idx, t.Length);
+            }
+
+            return (-1, 0);
+        }
     }
 }

@@ -173,14 +173,14 @@ namespace Godelian.Server.Endpoints.Client.FeatureRange
         public static async Task<ServerResponse> SubmitFeatureRanges(ClientRequest<FeatureRangeCollection> clientRequest)
         {
 
-            List<string> parentFeatureIDs = clientRequest.Data!.featureRecords.Select(x => x.ID!).Distinct().ToList();
+            List<string> parentFeatureIDs = clientRequest.Data!.featureRecords.Select(x => x.ParentFeature!.ID!).Distinct().ToList();
             List<Feature> parentFeatures = await DB.Find<Feature>().ManyAsync(x => parentFeatureIDs.Contains(x.ID));
 
             List<Feature> newFeatures = new List<Feature>();
 
             foreach (FeatureDTO feature in clientRequest.Data!.featureRecords)
             {
-                Feature parentFeature = parentFeatures.First(pf => pf.ID == feature.ID);
+                Feature parentFeature = parentFeatures.First(pf => pf.ID == feature.ParentFeature!.ID);
 
                 Feature record = new Feature
                 {
