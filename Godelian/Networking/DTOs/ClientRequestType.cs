@@ -12,7 +12,7 @@
 
         // Web
         ProgressStats =200,
-        SearchRecords=201,
+        SearchFeatures=201,
         RecentlyActiveClients=202,
         IPDistributionStats=203,
         GetRandomRecord=204,

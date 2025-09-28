@@ -7,6 +7,7 @@ import { Feature, HostRecord } from '../types/HostRecord.dto';
 import { IPDistributionStatsDto } from '../types/IPDistributionStats.dto';
 import { ProgressStatsDto } from '../types/ProgressStats.dto';
 import { RecentClientsDto } from '../types/RecentClients.dto';
+import { SearchResponse } from '../types/SearchFeatures.dto';
 import { ServerResponseDto } from '../types/ServerResponse.dto';
 
 export interface SearchResult {
@@ -88,6 +89,13 @@ export class ApiService {
     return this.sendRequest<HeaderValueStatsRequestDto, HeaderValueStatsResponseDto>({
       RequestType: ClientRequestType.HeaderValuesStats,
       Data: { HeaderName: headerName, TopN: topN }
+    });
+  }
+
+  searchFeatures(query: string): Observable<ServerResponseDto<SearchResponse>> {
+    return this.sendRequest<{ Query: string }, SearchResponse>({
+      RequestType: ClientRequestType.SearchFeatures,
+      Data: { Query: query }
     });
   }
 }

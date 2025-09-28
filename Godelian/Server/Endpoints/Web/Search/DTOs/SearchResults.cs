@@ -9,6 +9,6 @@ namespace Godelian.Server.Endpoints.Web.Search.DTOs
 {
     internal class SearchResults
     {
-        public required HostRecordModel[] hostRecords { get; set; }
+        public required FeatureDTO[] Features { get; set; }
     }
 }

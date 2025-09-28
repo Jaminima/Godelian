@@ -117,8 +117,8 @@ namespace Godelian.Server.Endpoints
                 // Web
                 case ClientRequestType.ProgressStats:
                     return await StatisticsEndpoints.ProgressStatistics(clientRequest);
-                //case ClientRequestType.SearchRecords:
-                //    return await SearchEndpoints.SearchRecords(ConvertPayload<SearchQuery>(clientRequest));
+                case ClientRequestType.SearchFeatures:
+                    return await SearchFeaturesEndpoint.SearchFeatures(ConvertPayload<SearchQuery>(clientRequest));
                 case ClientRequestType.RecentlyActiveClients:
                     return await StatisticsEndpoints.GetRecentlyActiveClients(clientRequest);
                 case ClientRequestType.IPDistributionStats:
