@@ -36,7 +36,7 @@ services:
       - ./godelian-site/ssl/pub.cer:/etc/ssl/pub.cer:ro
 
   mongodb:
-    image: mongo:7
+    image: mongo:4
     ports:
       - "100.73.169.56:27017:27017"
     volumes:
@@ -45,7 +45,7 @@ services:
       - MONGO_INITDB_DATABASE=godelian
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=changeme
-    command: ["mongod", "--bind_ip_all"]
+    command: ["mongod", "--bind_ip_all", "--nojournal"]
     restart: unless-stopped
     profiles: ["server"]
 

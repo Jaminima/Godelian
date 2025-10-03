@@ -2,6 +2,7 @@
 using Godelian.Networking.DTOs;
 using Godelian.Server.Endpoints.Client.Connection.DTOs;
 using Godelian.Server.Endpoints.Client.FeatureRange.DTOs;
+using Godelian.Server.Endpoints.Web.Search; // enqueue recent images for web endpoint
 using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Entities;
@@ -39,18 +40,20 @@ namespace Godelian.Server.Endpoints.Client.FeatureRange
                 int need = PrefetchTargetSize - cachedFeatureWorkItems.Count;
                 if (need <= 0) return;
 
-                FeatureType targetType = Random.Shared.Next(0,2) == 0 ? FeatureType.Image : FeatureType.Link;
+                // Fetch non-elaborated images only
+                List<Feature> imageDocs = await DB.Collection<Feature>()
+                                           .Aggregate()
+                                           .Match(f => f.Elaborated == false)
+                                           .Match(f => f.Type == FeatureType.Image)
+                                           .Limit(need)
+                                           .ToListAsync();
 
-                List<Feature> docs = await DB.Collection<Feature>()
-                                       .Aggregate()
-                                       .Match(f => f.Elaborated == false)
-                                       .Match(f => f.Type == targetType)
-                                       .Limit(need)
-                                       .ToListAsync();
+                if (imageDocs.Count == 0) return;
 
-                if (docs.Count == 0) return;
-
-                List<string> hostRecordIds = docs.Select(d => d.HostRecordID).Distinct().ToList();
+                List<string> hostRecordIds = imageDocs
+                                              .Select(d => d.HostRecordID)
+                                              .Distinct()
+                                              .ToList();
 
                 List<HostRecordModel> hostRecords = await DB.Find<HostRecordModel>()
                                                         .Match(hr => hostRecordIds.Contains(hr.ID))
@@ -72,8 +75,10 @@ namespace Godelian.Server.Endpoints.Client.FeatureRange
                         HostRequestMethod = hr.HostRequestMethod,
                     });
 
-                foreach (Feature f in docs)
+                // Enqueue images only
+                for (int imgIdx = 0; imgIdx < imageDocs.Count; imgIdx++)
                 {
+                    Feature f = imageDocs[imgIdx];
                     if (!hostDtoById.TryGetValue(f.HostRecordID, out HostRecordModelDTO? hostDto))
                         continue;
 
@@ -117,44 +122,58 @@ namespace Godelian.Server.Endpoints.Client.FeatureRange
                 _ = PrefetchFeatureWorkAsync();
             }
 
-            // If cache empty, fall back to direct DB fetch (legacy path)
-            if (items.Count == 0)
+            // If cache empty or insufficient, fall back to direct DB fetch for images only
+            if (items.Count < ServeBatchSize)
             {
-                List<Feature> records = await DB.Collection<Feature>()
-                                         .Aggregate()
-                                         .Match(f => f.Elaborated == false)
-                                         .Match(f => f.Type == FeatureType.Image || f.Type == FeatureType.Link)
-                                         .Limit(ServeBatchSize)
-                                         .ToListAsync();
+                int remaining = ServeBatchSize - items.Count;
 
-                List<string> hostRecordIds = records.Select(r => r.HostRecordID).ToList();
+                List<Feature> imageDocs = await DB.Collection<Feature>()
+                                           .Aggregate()
+                                           .Match(f => f.Elaborated == false)
+                                           .Match(f => f.Type == FeatureType.Image)
+                                           .Limit(remaining)
+                                           .ToListAsync();
+
+                List<string> hostRecordIds = imageDocs
+                                              .Select(d => d.HostRecordID)
+                                              .Distinct()
+                                              .ToList();
 
                 List<HostRecordModel> hostRecords = await DB.Find<HostRecordModel>()
                                                         .Match(hr => hostRecordIds.Contains(hr.ID))
-                                                        .Limit(ServeBatchSize)
                                                         .ExecuteAsync();
 
-                List<HostRecordModelDTO> _hostRecords = hostRecords.Select(x => new HostRecordModelDTO
-                {
-                    ID = x.ID,
-                    IPIndex = x.IPIndex,
-                    Iteration = x.Iteration,
-                    IPAddress = x.IPAddress,
-                    Hostname = x.Hostname,
-                    FoundByClientId = x.FoundByClientId,
-                    FoundAt = x.FoundAt,
-                    FeaturesElaborated = x.FeaturesElaborated,
-                    HostRequestMethod = x.HostRequestMethod,
-                }).ToList();
+                Dictionary<string, HostRecordModelDTO> hostDtoById = hostRecords.ToDictionary(
+                    hr => hr.ID,
+                    hr => new HostRecordModelDTO
+                    {
+                        ID = hr.ID,
+                        IPIndex = hr.IPIndex,
+                        Iteration = hr.Iteration,
+                        IPAddress = hr.IPAddress,
+                        Hostname = hr.Hostname,
+                        FoundByClientId = hr.FoundByClientId,
+                        FoundAt = hr.FoundAt,
+                        FeaturesElaborated = hr.FeaturesElaborated,
+                        HostRequestMethod = hr.HostRequestMethod,
+                    });
 
-                items = records.Select(x => new FeatureDTO
+                // Add images only
+                for (int imgIdx = 0; items.Count < ServeBatchSize && imgIdx < imageDocs.Count; imgIdx++)
                 {
-                    ID = x.ID,
-                    Content = x.Content,
-                    Base64Content = null,
-                    Type = x.Type,
-                    HostRecord = _hostRecords.First(y => y.ID == x.HostRecordID)
-                }).ToList();
+                    Feature f = imageDocs[imgIdx];
+                    if (!hostDtoById.TryGetValue(f.HostRecordID, out HostRecordModelDTO? hostDto))
+                        continue;
+
+                    items.Add(new FeatureDTO
+                    {
+                        ID = f.ID,
+                        Content = f.Content,
+                        Base64Content = null,
+                        Type = f.Type,
+                        HostRecord = hostDto
+                    });
+                }
             }
 
             Console.WriteLine($"Client '{clientRequest.ClientNickname}' assigned {items.Count} records to analyze features");
@@ -172,44 +191,98 @@ namespace Godelian.Server.Endpoints.Client.FeatureRange
 
         public static async Task<ServerResponse> SubmitFeatureRanges(ClientRequest<FeatureRangeCollection> clientRequest)
         {
+            // Offload DB work so we don't block responding to the client
+            _ = Task.Run(() => SaveFeatureRangesAsync(clientRequest));
 
-            List<string> parentFeatureIDs = clientRequest.Data!.featureRecords.Select(x => x.ParentFeature!.ID!).Distinct().ToList();
-            List<Feature> parentFeatures = await DB.Find<Feature>().ManyAsync(x => parentFeatureIDs.Contains(x.ID));
-
-            List<Feature> newFeatures = new List<Feature>();
-
-            foreach (FeatureDTO feature in clientRequest.Data!.featureRecords)
-            {
-                Feature parentFeature = parentFeatures.First(pf => pf.ID == feature.ParentFeature!.ID);
-
-                Feature record = new Feature
-                {
-                    Content = feature.Content,
-                    Base64Content = feature.Base64Content,
-                    Type = feature.Type,
-                    HostRecordID = parentFeature.HostRecordID,
-                    ParentFeatureID = parentFeature.ID
-                };
-
-                newFeatures.Add(record);
-            }
-
-            foreach (Feature feature in parentFeatures)
-            {
-                feature.Elaborated = true;
-            }
-
-            List<Feature> allToSave = parentFeatures.Concat(newFeatures).ToList();
-            if (allToSave.Count > 0)
-                await DB.SaveAsync(allToSave);
-
-            Console.WriteLine($"Client '{clientRequest.ClientNickname}' submitted features for {clientRequest.Data.featureRecords.Length} records");
+            Console.WriteLine($"Client '{clientRequest.ClientNickname}' submitted features for {clientRequest.Data!.featureRecords.Length} records (queued for processing)");
 
             return new ServerResponse
             {
                 Success = true,
-                Message = "Feature ranges submitted successfully."
+                Message = "Feature ranges accepted for processing."
             };
+        }
+
+        private static async Task SaveFeatureRangesAsync(ClientRequest<FeatureRangeCollection> clientRequest)
+        {
+            try
+            {
+                List<string> parentFeatureIDs = clientRequest.Data!.featureRecords.Select(x => x.ParentFeature!.ID!).Distinct().ToList();
+                List<Feature> parentFeatures = await DB.Find<Feature>().ManyAsync(x => parentFeatureIDs.Contains(x.ID));
+
+                List<Feature> newFeatures = new List<Feature>();
+
+                foreach (FeatureDTO feature in clientRequest.Data!.featureRecords)
+                {
+                    Feature parentFeature = parentFeatures.First(pf => pf.ID == feature.ParentFeature!.ID);
+
+                    Feature record = new Feature
+                    {
+                        Content = feature.Content,
+                        Base64Content = feature.Base64Content,
+                        Type = feature.Type,
+                        HostRecordID = parentFeature.HostRecordID,
+                        ParentFeatureID = parentFeature.ID
+                    };
+
+                    newFeatures.Add(record);
+                }
+
+                // Only mark image parent features as elaborated
+                foreach (Feature feature in parentFeatures.Where(f => f.Type == FeatureType.Image))
+                {
+                    feature.Elaborated = true;
+                }
+
+                List<Feature> allToSave = parentFeatures.Concat(newFeatures).ToList();
+
+                if (allToSave.Count > 0)
+                    await DB.SaveAsync(allToSave);
+
+                if (newFeatures.Count > 0)
+                {
+                    List<string> hostRecordIds = parentFeatures.Select(p => p.HostRecordID).Distinct().ToList();
+                    List<HostRecordModel> hostRecords = await DB.Find<HostRecordModel>()
+                                                                .Match(hr => hostRecordIds.Contains(hr.ID))
+                                                                .ExecuteAsync();
+                    Dictionary<string, HostRecordModelDTO> hostDtoById = hostRecords.ToDictionary(
+                        hr => hr.ID,
+                        hr => new HostRecordModelDTO
+                        {
+                            ID = hr.ID,
+                            IPIndex = hr.IPIndex,
+                            Iteration = hr.Iteration,
+                            IPAddress = hr.IPAddress,
+                            Hostname = hr.Hostname,
+                            FoundByClientId = hr.FoundByClientId,
+                            FoundAt = hr.FoundAt,
+                            FeaturesElaborated = hr.FeaturesElaborated,
+                            HostRequestMethod = hr.HostRequestMethod,
+                        });
+
+                    foreach (Feature nf in newFeatures)
+                    {
+                        if (string.IsNullOrEmpty(nf.Base64Content)) continue;
+
+                        if (!hostDtoById.TryGetValue(nf.HostRecordID, out var hostDto)) continue;
+
+                        RandomImageFeatureEndpoint.EnqueueRecentImage(new FeatureDTO
+                        {
+                            ID = nf.ID,
+                            Content = null,
+                            Base64Content = nf.Base64Content,
+                            Type = nf.Type,
+                            Elaborated = nf.Elaborated,
+                            ParentFeature = null,
+                            HostRecord = hostDto
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error processing submitted feature ranges: {ex}");
+            }
         }
     }
 }

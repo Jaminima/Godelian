@@ -2,6 +2,7 @@
 using Godelian.Models;
 using Godelian.Networking.DTOs;
 using Godelian.Server.Endpoints.Client.HostRecords.DTOs;
+using Godelian.Server.Endpoints.Web.Search; // enqueue recent host records for web endpoint
 using MongoDB.Bson;
 using MongoDB.Entities;
 using System;
@@ -60,59 +61,81 @@ namespace Godelian.Server.Endpoints.Client.HostRecords
                 return response;
             }
 
+            // Persist the batch state synchronously so the system reflects completion immediately
             await ipBatch.SaveAsync();
 
-            foreach (HostRecordModelDTO record in clientRequest.Data.HostRecords)
+            // Offload saving of host records to a background task to avoid blocking the response
+            _ = Task.Run(() => SaveHostRecordsAsync(clientRequest));
+
+            response.Success = true;
+            response.Message = "Host records accepted for processing.";
+            response.Data = new SubmitHostRecordsResponse();
+            return response;            
+        }
+
+        private static async Task SaveHostRecordsAsync(ClientRequest<SubmitHostRecordsRequest> clientRequest)
+        {
+            if (clientRequest.Data == null || clientRequest.Data.HostRecords == null || clientRequest.Data.HostRecords.Count == 0)
             {
-                try
-                {
+                return;
+            }
 
-                    HostRecordModel hostRecordModel = new HostRecordModel
+            try
+            {
+                HostRecordModel[] newRecords = clientRequest.Data!.HostRecords
+                    .Select(x => new HostRecordModel
                     {
-                        IPIndex = record.IPIndex,
-                        IPAddress = record.IPAddress,
-                        Iteration = record.Iteration,
-                        Hostname = record.Hostname,
+                        IPIndex = x.IPIndex,
+                        IPAddress = x.IPAddress,
+                        Iteration = x.Iteration,
+                        Hostname = x.Hostname,
                         FoundByClientId = clientRequest.ClientId!,
-                        HostRequestMethod = record.HostRequestMethod,
-                        HeaderKeys = record.HeaderRecords.Select(x=>x.Name).ToList(),
-                    };
+                        HostRequestMethod = x.HostRequestMethod,
+                        HeaderKeys = x.HeaderRecords.Select(h => h.Name).ToList(),
+                    })
+                    .ToArray();
 
-                    await hostRecordModel.SaveAsync();
+                await DB.SaveAsync(newRecords);
+
+                List<HeaderRecord> newHeaders = new();
+                List<Feature> newFeatures = new();
+
+                foreach (HostRecordModel hostRecord in newRecords)
+                {
+                    HostRecordModelDTO record = clientRequest.Data.HostRecords
+                        .First(x => x.IPIndex == hostRecord.IPIndex && x.Iteration == hostRecord.Iteration && x.Hostname == hostRecord.Hostname && x.IPAddress == hostRecord.IPAddress);
 
                     List<HeaderRecord> headerRecords = record.HeaderRecords.Select(x => new HeaderRecord
                     {
-                        HostRecordID = hostRecordModel.ID,
+                        HostRecordID = hostRecord.ID,
                         Name = x.Name,
                         Value = x.Value,
                     }).ToList();
 
-                    foreach (HeaderRecord header in headerRecords)
-                    {
-                        await header.SaveAsync();
-                    }
+                    newHeaders.AddRange(headerRecords);
 
                     List<Feature> features = record.Features.Select(x => new Feature
                     {
-                        HostRecordID = hostRecordModel.ID,
+                        HostRecordID = hostRecord.ID,
                         Type = x.Type,
                         Content = x.Content,
                     }).ToList();
 
-                    foreach (Feature feature in features)
-                    {
-                        await feature.SaveAsync();
-                    }
+                    newFeatures.AddRange(features);
 
-                    await hostRecordModel.SaveAsync();
+                    RandomHostRecordEndpoint.EnqueueRecentHostRecord(record);
                 }
-                catch (BsonSerializationException ex)
-                {
-                    //Record was too big so lets just not save it
-                }
+
+                if (newHeaders.Count > 0)
+                    await DB.SaveAsync(newHeaders);
+
+                if (newFeatures.Count > 0)
+                    await DB.SaveAsync(newFeatures);
             }
-
-            return response;            
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unhandled error while saving host records: {ex}");
+            }
         }
     }
 }

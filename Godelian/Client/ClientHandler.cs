@@ -49,7 +49,7 @@ namespace Godelian.Client
 
         private async Task MainLoop()
         {
-            const double elaborateProbability = 0.9;
+            const double elaborateProbability = 0.95;
 
             while (true)
             {
